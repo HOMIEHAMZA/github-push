@@ -1,0 +1,103 @@
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+
+// Route imports
+import { authRoutes } from './routes/auth.routes';
+import { productRoutes } from './routes/products.routes';
+// import { categoryRoutes } from './routes/categories.routes';
+import { orderRoutes } from './routes/orders.routes';
+import { cartRoutes } from './routes/cart.routes';
+// import { userRoutes } from './routes/users.routes';
+import { adminRoutes } from './routes/admin.routes';
+import { builderRoutes } from './routes/builder.routes';
+// import { reviewRoutes } from './routes/reviews.routes';
+import { wishlistRoutes } from './routes/wishlist.routes';
+import { addressRoutes } from './routes/addresses.routes';
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// ─── Security Middleware ───────────────────────────────────────────────────────
+app.use(helmet());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+
+// ─── Rate Limiting ─────────────────────────────────────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 2000, // Increased for testing
+  message: { error: 'Too many requests. Slow down.' },
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200, // Increased for testing
+  message: { error: 'Too many auth attempts.' },
+});
+
+// ─── Body Parsing ──────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ─── Logging ───────────────────────────────────────────────────────────────────
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
+
+// ─── Health Check ──────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'online',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV,
+  });
+});
+
+// ─── API Routes ────────────────────────────────────────────────────────────────
+const API = '/api/v1';
+
+app.use(`${API}/auth`, authLimiter, authRoutes);
+app.use(`${API}/products`, apiLimiter, productRoutes);
+// app.use(`${API}/categories`, apiLimiter, categoryRoutes);
+app.use(`${API}/orders`, apiLimiter, orderRoutes);
+app.use(`${API}/cart`, apiLimiter, cartRoutes);
+// app.use(`${API}/users`, apiLimiter, userRoutes);
+app.use(`${API}/admin`, apiLimiter, adminRoutes);
+app.use(`${API}/builder`, apiLimiter, builderRoutes);
+// app.use(`${API}/reviews`, apiLimiter, reviewRoutes);
+app.use(`${API}/wishlist`, apiLimiter, wishlistRoutes);
+app.use(`${API}/addresses`, apiLimiter, addressRoutes);
+
+// ─── 404 Fallback ──────────────────────────────────────────────────────────────
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Route not found.' });
+});
+
+// ─── Global Error Handler ──────────────────────────────────────────────────────
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error.'
+      : err.message,
+  });
+});
+
+// ─── Start Server ──────────────────────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`
+  ┌──────────────────────────────────────────┐
+  │   ACCESSOMART API — Running on :${PORT}    │
+  │   Environment: ${process.env.NODE_ENV?.padEnd(10)}              │
+  │   Base URL: http://localhost:${PORT}/api/v1  │
+  └──────────────────────────────────────────┘
+  `);
+});
+
+export default app;
