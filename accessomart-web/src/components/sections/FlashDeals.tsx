@@ -49,10 +49,16 @@ export function FlashDeals({ title, subtitle, deals, timeLeft }: FlashDealsProps
           </div>
           
           <div className="flex gap-4">
-            <button className="w-12 h-12 rounded-full border border-outline-variant/20 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">
+            <button 
+              aria-label="Previous Deals"
+              className="w-12 h-12 rounded-full border border-outline-variant/20 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
+            >
               <svg className="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <button className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center text-primary bg-primary/5 hover:bg-primary/10 transition-colors">
+            <button 
+              aria-label="Next Deals"
+              className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+            >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
@@ -88,7 +94,7 @@ export function FlashDeals({ title, subtitle, deals, timeLeft }: FlashDealsProps
 
 function TimeUnit({ value, label }: { value: number; label: string }) {
   return (
-    <div className="flex flex-col items-center min-w-[3rem]">
+    <div className="flex flex-col items-center min-w-12">
       <span className="text-2xl font-display text-primary leading-none">
         {value.toString().padStart(2, '0')}
       </span>

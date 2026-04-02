@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { GlassNavbar } from '@/components/ui/GlassNavbar';
-import { Footer } from '@/components/ui/Footer';
 import { Hero } from '@/components/sections/Hero';
 import { CategoryGrid } from '@/components/sections/CategoryGrid';
 import { FlashDeals } from '@/components/sections/FlashDeals';
@@ -15,11 +13,11 @@ import { ApiProduct } from '@/lib/api-types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // Importing refined homepage layout data (non-product config preserved)
-import { 
-  heroData, 
-  categories, 
-  flashDealsData, 
-  promoData 
+import {
+  heroData,
+  categories,
+  flashDealsData,
+  promoData,
 } from '@/lib/homepage-data';
 
 const LoadingSection = () => (
@@ -40,12 +38,10 @@ export default function Homepage() {
   const { homepageLayout } = useAdminStore();
   const [mounted, setMounted] = useState(false);
 
-  // Live Products State
   const [liveProducts, setLiveProducts] = useState<ApiProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle Hydration & Fetching
   useEffect(() => {
     setMounted(true);
     let isSubscribed = true;
@@ -53,29 +49,30 @@ export default function Homepage() {
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        const res = await productsApi.list({ limit: 50 }); // Fetch enough for distribution
+        const res = await productsApi.list({ limit: 50 });
         if (isSubscribed) {
           setLiveProducts(res.products);
           setError(null);
         }
-      } catch (err: any) {
-        if (isSubscribed) setError(err.message || 'Failed to load live catalog');
+      } catch (err) {
+        if (isSubscribed) setError(err instanceof Error ? err.message : 'Failed to load live catalog');
       } finally {
         if (isSubscribed) setIsLoading(false);
       }
     };
 
     fetchProducts();
-    return () => { isSubscribed = false; };
+    return () => {
+      isSubscribed = false;
+    };
   }, []);
 
   if (!mounted) return null;
 
-  // Process Featured Products
   const mappedFeaturedProducts = liveProducts
-    .filter(p => p.isFeatured)
+    .filter((p) => p.isFeatured)
     .slice(0, 4)
-    .map(p => ({
+    .map((p) => ({
       id: p.id,
       variantId: p.variants?.[0]?.id || p.id,
       slug: p.slug,
@@ -84,15 +81,17 @@ export default function Homepage() {
       category: p.category?.name || 'Category',
       price: `$${p.basePrice.toLocaleString()}`,
       imageUrl: p.images?.[0]?.url || '/placeholder.png',
-      isFeatured: p.isFeatured
+      isFeatured: p.isFeatured,
     }));
 
-  // Process Flash Deals Dynamically
   const mappedFlashDeals = liveProducts
-    .filter(p => p.comparePrice && (p.comparePrice > p.basePrice))
+    .filter((p) => p.comparePrice && p.comparePrice > p.basePrice)
     .slice(0, 4)
-    .map(p => {
-      const discountPercent = Math.round(((p.comparePrice! - p.basePrice) / p.comparePrice!) * 100);
+    .map((p) => {
+      const discountPercent = Math.round(
+        ((p.comparePrice! - p.basePrice) / p.comparePrice!) * 100
+      );
+
       return {
         id: p.id,
         variantId: p.variants?.[0]?.id || p.id,
@@ -103,15 +102,13 @@ export default function Homepage() {
         price: `$${p.basePrice.toLocaleString()}`,
         originalPrice: `$${p.comparePrice!.toLocaleString()}`,
         imageUrl: p.images?.[0]?.url || '/placeholder.png',
-        discount: `${discountPercent}%`
+        discount: `${discountPercent}%`,
       };
     });
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <GlassNavbar />
-      
-      <main className="flex-grow">
+      <main className="grow">
         {homepageLayout.map((section) => {
           if (!section.enabled) return null;
 
@@ -120,23 +117,23 @@ export default function Homepage() {
               return <Hero key="hero" {...heroData} />;
             case 'categories':
               return (
-                <CategoryGrid 
+                <CategoryGrid
                   key="categories"
-                  title="CURATED GEAR." 
-                  subtitle="Explore our Collections" 
-                  categories={categories} 
+                  title="CURATED GEAR."
+                  subtitle="Explore our Collections"
+                  categories={categories}
                 />
               );
             case 'flash':
               if (isLoading) return <LoadingSection key="flash-loading" />;
               if (error) return <ErrorSection key="flash-error" />;
               return (
-                <FlashDeals 
-                  key="flash" 
+                <FlashDeals
+                  key="flash"
                   title={flashDealsData.title}
                   subtitle={flashDealsData.subtitle}
                   timeLeft={flashDealsData.timeLeft}
-                  deals={mappedFlashDeals} 
+                  deals={mappedFlashDeals}
                 />
               );
             case 'promo':
@@ -145,11 +142,11 @@ export default function Homepage() {
               if (isLoading) return <LoadingSection key="featured-loading" />;
               if (error) return <ErrorSection key="featured-error" />;
               return (
-                <FeaturedProducts 
+                <FeaturedProducts
                   key="featured"
-                  title="LEGENDARY TIER." 
-                  subtitle="Featured Accessories" 
-                  products={mappedFeaturedProducts} 
+                  title="LEGENDARY TIER."
+                  subtitle="Featured Accessories"
+                  products={mappedFeaturedProducts}
                 />
               );
             case 'newsletter':
@@ -159,8 +156,6 @@ export default function Homepage() {
           }
         })}
       </main>
-
-      <Footer />
     </div>
   );
 }

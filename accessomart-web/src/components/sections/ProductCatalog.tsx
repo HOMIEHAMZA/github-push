@@ -1,13 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Filter, ChevronDown, Grid, List, Search, Loader2, AlertCircle } from 'lucide-react';
+import { Filter, ChevronDown, Search, Loader2, AlertCircle } from 'lucide-react';
 import { productsApi } from '@/lib/api-client';
 import { ApiProduct } from '@/lib/api-types';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { FilterSidebar } from './FilterSidebar';
-import { GlassNavbar } from '@/components/ui/GlassNavbar';
-import { Footer } from '@/components/ui/Footer';
 
 export function ProductCatalog() {
   // Data State
@@ -26,8 +24,8 @@ export function ProductCatalog() {
         if (mounted) {
           setProducts(res.products);
         }
-      } catch (err: any) {
-        if (mounted) setError(err.message || 'Failed to fetch products');
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : 'Failed to fetch products');
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -90,7 +88,7 @@ export function ProductCatalog() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col pt-24">
+    <div className="min-h-screen bg-surface flex flex-col pt-24 grow">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 w-full mb-20">
         
         {/* Header & Controls */}
@@ -120,6 +118,7 @@ export function ProductCatalog() {
             {/* Sort Dropdown */}
             <div className="relative group min-w-48">
               <select 
+                aria-label="Sort products"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full appearance-none bg-surface-container border border-surface-container-highest/20 rounded-lg px-4 py-3 text-sm font-sans text-on-surface focus:outline-none focus:border-primary/40 cursor-pointer"
