@@ -308,7 +308,7 @@ adminRoutes.post('/products', async (req, res) => {
         costPrice: data.costPrice,
         weight: data.weight,
         status: data.status || 'DRAFT',
-      },
+      } as any,
       include: {
         brand: true,
         category: true,
@@ -336,7 +336,7 @@ adminRoutes.patch('/products/:id', async (req, res) => {
         comparePrice: data.comparePrice,
         costPrice: data.costPrice,
         weight: data.weight,
-      },
+      } as any,
       include: {
         brand: true,
         category: true,
