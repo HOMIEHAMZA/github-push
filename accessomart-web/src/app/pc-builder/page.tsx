@@ -7,8 +7,6 @@ import { builderComponents, builderCategories } from '@/lib/builder-data';
 import { PCBuilderNav } from '@/components/builder/PCBuilderNav';
 import { ComponentCard } from '@/components/builder/ComponentCard';
 import { BuildSummary } from '@/components/builder/BuildSummary';
-import { GlassNavbar } from '@/components/ui/GlassNavbar';
-import { Footer } from '@/components/ui/Footer';
 import { Zap, Cpu, Settings2, ShieldCheck } from 'lucide-react';
 
 export default function PCBuilderPage() {
@@ -25,8 +23,7 @@ export default function PCBuilderPage() {
   const filteredComponents = builderComponents.filter(c => c.category === activeCategory);
 
   return (
-    <main className="min-h-screen bg-zinc-950">
-      <GlassNavbar />
+    <div className="min-h-screen bg-zinc-950">
       
       {/* Hero Section */}
       <section className="relative pt-32 pb-12 overflow-hidden">
@@ -138,7 +135,6 @@ export default function PCBuilderPage() {
         </div>
       </section>
 
-      <Footer />
-    </main>
+    </div>
   );
 }

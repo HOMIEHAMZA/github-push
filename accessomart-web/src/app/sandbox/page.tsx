@@ -1,7 +1,5 @@
 import React from 'react';
-import { GlassNavbar } from '@/components/ui/GlassNavbar';
-import { Footer } from '@/components/ui/Footer';
-import { Button, PrimaryButton, SecondaryButton, TertiaryButton } from '@/components/ui/Button';
+import { PrimaryButton, SecondaryButton, TertiaryButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { SpecSheetGlass } from '@/components/ui/SpecSheetGlass';
@@ -16,9 +14,7 @@ export default function SandboxPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <GlassNavbar />
-      
-      <main className="flex-grow pt-32 pb-20 px-6 container mx-auto">
+      <main className="grow pt-32 pb-20 px-6 container mx-auto">
         <h1 className="text-5xl font-display text-on-surface mb-12">UI Components Sandbox</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
@@ -80,7 +76,6 @@ export default function SandboxPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

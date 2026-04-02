@@ -9,16 +9,16 @@ import {
   ChevronRight,
   TrendingUp,
   ShieldCheck,
-  CreditCard,
   AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ordersApi, wishlistApi, addressApi } from '@/lib/api-client';
-import { ApiOrder, ApiAddress, ApiWishlistItem } from '@/lib/api-types';
+import { ApiOrder, ApiAddress } from '@/lib/api-types';
 
 export default function AccountDashboard() {
-  const { user } = useAuthStore();
+  // user is intentionally left unused for potential future UI personalization
+  // const { user } = useAuthStore();
   const [recentOrders, setRecentOrders] = useState<ApiOrder[]>([]);
   const [defaultAddress, setDefaultAddress] = useState<ApiAddress | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -37,9 +37,9 @@ export default function AccountDashboard() {
       setRecentOrders(ordersRes.orders.slice(0, 3));
       setWishlistCount(wishlistRes.wishlist.length);
       setDefaultAddress(addressRes.addresses.find(a => a.isDefault) || addressRes.addresses[0] || null);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to fetch dashboard data', err);
-      setError(err.message || 'Interfacing failure. Critical data retrieval unsuccessful.');
+      setError(err instanceof Error ? err.message : 'Interfacing failure. Critical data retrieval unsuccessful.');
     } finally {
       setIsLoading(false);
     }

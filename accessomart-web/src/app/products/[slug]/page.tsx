@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { productsApi } from '@/lib/api-client';
 import { ApiProduct } from '@/lib/api-types';
-import { GlassNavbar } from '@/components/ui/GlassNavbar';
-import { Footer } from '@/components/ui/Footer';
 import { ProductGallery } from '@/components/sections/ProductGallery';
 import { ProductPurchaseBlock } from '@/components/sections/ProductPurchaseBlock';
 import { SpecSheetGlass } from '@/components/ui/SpecSheetGlass';
@@ -31,8 +29,8 @@ export default function ProductDetailPage() {
         if (mounted) {
           setProduct(res.product);
         }
-      } catch (err: any) {
-        if (mounted) setError(err.message || 'Failed to fetch product details');
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : 'Failed to fetch product details');
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -43,24 +41,21 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col pt-24 lg:pt-32">
-        <GlassNavbar />
-        <main className="flex-grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full flex items-center justify-center">
+      <div className="grow flex flex-col pt-24 lg:pt-32">
+        <main className="grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full flex items-center justify-center">
           <div className="flex flex-col items-center justify-center p-16 text-center bg-surface-container/30 rounded-2xl border border-surface-container-highest/20 mx-auto w-full max-w-lg mt-32">
             <Loader2 className="animate-spin text-primary mb-4" size={48} />
             <p className="text-on-surface-variant font-sans animate-pulse">Interfacing with Mainframe...</p>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col pt-24 lg:pt-32">
-        <GlassNavbar />
-        <main className="flex-grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full flex items-center justify-center">
+      <div className="grow flex flex-col pt-24 lg:pt-32">
+        <main className="grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full flex items-center justify-center">
           <div className="flex flex-col items-center justify-center p-16 text-center bg-surface-container/30 rounded-2xl border border-error/20 mx-auto w-full max-w-lg mt-32">
             <AlertCircle className="text-error mb-4" size={48} />
             <p className="text-on-surface font-sans mb-2">System Failure: Module offline.</p>
@@ -73,7 +68,6 @@ export default function ProductDetailPage() {
             </button>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
@@ -95,10 +89,9 @@ export default function ProductDetailPage() {
   const rating = 5; // Defaulted mock data for UI logic purposes for now
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col pt-24 lg:pt-32">
-      <GlassNavbar />
+    <div className="grow flex flex-col pt-24 lg:pt-32">
       
-      <main className="flex-grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full">
+      <main className="grow max-w-[1440px] mx-auto px-6 lg:px-12 w-full">
         {/* Product Overview Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24">
           {/* Left: Gallery */}
@@ -168,7 +161,6 @@ export default function ProductDetailPage() {
         </section>
       </main>
 
-      <Footer />
     </div>
   );
 }
