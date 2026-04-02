@@ -6,7 +6,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { adminApi } from '@/lib/api-client';
 import { ApiProductImage } from '@/lib/api-types';
-import { useToastStore } from '@/store/useToastStore';
+import Image from 'next/image';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -19,7 +19,6 @@ interface ImageUploaderProps {
 }
 
 export function ImageUploader({ productId, images, onImagesChange }: ImageUploaderProps) {
-  const { addToast } = useToastStore();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +39,12 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
       const fileArray = Array.from(files);
       const res = await adminApi.uploadImages(productId, fileArray);
       onImagesChange(res.images);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error details:', err);
-      const errorMessage = err?.details?.[0]?.message || err?.error || err?.message || 'Failed to upload images';
+      const errorMessage = (err as { details?: Array<{ message: string }>; error?: string; message?: string })?.details?.[0]?.message 
+        || (err as { error?: string })?.error 
+        || (err as { message?: string })?.message 
+        || 'Failed to upload images';
       setError(errorMessage);
     } finally {
       setIsUploading(false);
@@ -132,52 +134,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
           <p className="text-sm text-slate-400 max-w-xs mb-4">
             Drag and drop or click to upload. Power your product with crystal-clear visuals. (Max 10 images)
           </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 z-50">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const simulate = async () => {
-                  const base64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-                  const blob = await (await fetch(base64)).blob();
-                  const file = new File([blob], "test-pixel.png", { type: "image/png" });
-                  
-                  const dt = new DataTransfer();
-                  dt.items.add(file);
-                  handleUpload(dt.files);
-                };
-                simulate();
-              }}
-              className="px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-bold hover:bg-cyan-500 hover:text-slate-900 transition-all uppercase tracking-widest"
-            >
-              DEBUG: RUN BINARY UPLOAD
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                // Simulation mode: just update local state with a dummy image
-                const mockImages: ApiProductImage[] = [
-                  ...images,
-                  {
-                    id: `mock-${Date.now()}`,
-                    url: 'https://placehold.co/600x600/0f172a/06b6d4?text=AccessoMart+Visual',
-                    altText: 'Mocked Upload for Verification',
-                    isPrimary: images.length === 0,
-                    sortOrder: images.length
-                  }
-                ];
-                onImagesChange(mockImages);
-                setError(null);
-                addToast('System simulation: Mocked image registered', 'success');
-              }}
-              className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold hover:bg-amber-500 hover:text-slate-900 transition-all uppercase tracking-widest"
-            >
-              DEBUG: SIMULATE MOCKED UI
-            </button>
-          </div>
         </div>
       </div>
 
@@ -202,10 +158,12 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
                   : "border-slate-700 hover:border-slate-500"
               )}
             >
-              <img 
+              <Image 
                 src={image.url} 
                 alt={image.altText || 'Product visual asset'} 
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                fill
+                sizes="(max-width: 768px) 50vw, 20vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
               />
               
               {/* Badge for Primary */}

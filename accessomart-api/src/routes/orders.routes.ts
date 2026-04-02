@@ -91,7 +91,7 @@ orderRoutes.post('/', authenticate, async (req: AuthRequest, res) => {
     }
   } else if (paymentProvider === 'PAYPAL') {
     try {
-      const request = new paypal.orders.OrdersCreateRequest();
+      const request = new (paypal.orders as any).OrdersCreateRequest();
       request.prefer("return=representation");
       request.requestBody({
         intent: 'CAPTURE',
@@ -238,7 +238,7 @@ orderRoutes.post('/:id/capture-paypal', authenticate, async (req: AuthRequest, r
 
   try {
     // Capture the PayPal order
-    const request = new paypal.orders.OrdersCaptureRequest(paypalOrderId);
+    const request = new (paypal.orders as any).OrdersCaptureRequest(paypalOrderId);
     request.requestBody({});
     const response = await paypalClient.execute(request);
 

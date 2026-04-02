@@ -29,15 +29,22 @@ app.use(cors({
 }));
 
 // ─── Rate Limiting ─────────────────────────────────────────────────────────────
+const isProd = process.env.NODE_ENV === 'production';
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 2000, // Increased for testing
+  max: isProd ? 100 : 2000, // Strict limit in production, generous in dev
   message: { error: 'Too many requests. Slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200, // Increased for testing
-  message: { error: 'Too many auth attempts.' },
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isProd ? 10 : 200, // Very strict for authentication attempts
+  message: { error: 'Too many auth attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // ─── Body Parsing ──────────────────────────────────────────────────────────────

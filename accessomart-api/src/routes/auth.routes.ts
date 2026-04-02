@@ -23,15 +23,18 @@ const loginSchema = z.object({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateTokens(userId: string, role: string) {
+  const accessSecret = process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me';
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me';
+
   const accessToken = jwt.sign(
     { userId, role },
-    process.env.JWT_ACCESS_SECRET!,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
+    accessSecret,
+    { expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as any }
   );
   const refreshToken = jwt.sign(
     { userId },
-    process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    refreshSecret,
+    { expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any }
   );
   return { accessToken, refreshToken };
 }
