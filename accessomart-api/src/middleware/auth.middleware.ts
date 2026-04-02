@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import * as core from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 
-export interface AuthRequest extends Request {
+export interface AuthRequest<
+  P = core.ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = core.Query
+> extends Request<P, ResBody, ReqBody, ReqQuery> {
   userId?: string;
   userRole?: string;
 }
