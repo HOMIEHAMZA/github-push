@@ -34,6 +34,11 @@ yarn-error.log*
 *.log
 typescript_errors.txt
 ts_errors.txt
+push_error.txt
+push-test.txt
+
+# TypeScript
+*.tsbuildinfo
 
 # Prisma
 /prisma/migrations/
