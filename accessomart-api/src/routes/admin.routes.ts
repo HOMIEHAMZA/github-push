@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.middleware';
-
+import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 import { upload, cloudinary } from '../lib/cloudinary';
 
 export const adminRoutes = Router();
@@ -34,7 +33,6 @@ adminRoutes.get('/dashboard', async (_req, res) => {
     }),
   ]);
 
-  // Revenue calculation
   const revenueResult = await prisma.order.aggregate({
     where: { status: { in: ['DELIVERED', 'CONFIRMED', 'PROCESSING', 'SHIPPED'] } },
     _sum: { total: true },
@@ -53,7 +51,6 @@ adminRoutes.get('/dashboard', async (_req, res) => {
 });
 
 // ─── Homepage Sections CMS ────────────────────────────────────────────────────
-
 adminRoutes.get('/homepage', async (_req, res) => {
   const sections = await prisma.homepageSection.findMany({
     orderBy: { sortOrder: 'asc' },
@@ -71,11 +68,9 @@ adminRoutes.patch('/homepage/:id', async (req, res) => {
 });
 
 // ─── Admin Settings ───────────────────────────────────────────────────────────
-
 adminRoutes.get('/settings', async (_req, res) => {
   const settings = await prisma.adminSetting.findMany();
-  // Transform to object: { pc_builder_enabled: true, ... }
-  const map = Object.fromEntries(settings.map(s => [s.key, s.value]));
+  const map = Object.fromEntries(settings.map((s) => [s.key, s.value]));
   return res.json({ settings: map });
 });
 
@@ -88,8 +83,7 @@ adminRoutes.put('/settings/:key', async (req, res) => {
   return res.json({ setting });
 });
 
-// ─── Admin Orders (all, not just user's) ─────────────────────────────────────
-
+// ─── Admin Orders ─────────────────────────────────────────────────────────────
 adminRoutes.get('/orders', async (req, res) => {
   const { status, page = '1', limit = '20' } = req.query;
   const where: any = {};
@@ -114,10 +108,10 @@ adminRoutes.get('/orders', async (req, res) => {
 });
 
 // ─── Admin Customers ──────────────────────────────────────────────────────────
-
 adminRoutes.get('/customers', async (req, res) => {
   const { page = '1', limit = '20', search } = req.query;
   const where: any = { role: 'CUSTOMER' };
+
   if (search) {
     where.OR = [
       { email: { contains: search as string, mode: 'insensitive' } },
@@ -130,24 +124,28 @@ adminRoutes.get('/customers', async (req, res) => {
     skip: (parseInt(page as string) - 1) * parseInt(limit as string),
     take: parseInt(limit as string),
     select: {
-      id: true, email: true, firstName: true, lastName: true,
-      isActive: true, createdAt: true,
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      isActive: true,
+      createdAt: true,
       _count: { select: { orders: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
+
   return res.json({ customers });
 });
 
 // ─── Admin Brands ─────────────────────────────────────────────────────────────
-
 adminRoutes.get('/brands', async (_req, res) => {
   try {
     const brands = await prisma.brand.findMany({
       orderBy: { name: 'asc' },
     });
     return res.json({ brands });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch brands' });
   }
 });
@@ -158,13 +156,12 @@ adminRoutes.post('/brands', async (req, res) => {
       data: req.body,
     });
     return res.status(201).json({ brand });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to create brand' });
   }
 });
 
 // ─── Admin Categories ─────────────────────────────────────────────────────────
-
 adminRoutes.get('/categories', async (_req, res) => {
   const categories = await prisma.category.findMany({
     orderBy: { sortOrder: 'asc' },
@@ -181,7 +178,6 @@ adminRoutes.post('/categories', async (req, res) => {
 });
 
 // ─── Admin Products ───────────────────────────────────────────────────────────
-
 const productCreateSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).optional(),
@@ -203,7 +199,6 @@ const productCreateSchema = z.object({
 
 const productUpdateSchema = productCreateSchema.partial();
 
-// GET /api/v1/admin/products - List products with pagination and filters
 adminRoutes.get('/products', async (req, res) => {
   const {
     page = '1',
@@ -211,7 +206,7 @@ adminRoutes.get('/products', async (req, res) => {
     status,
     categoryId,
     brandId,
-    search
+    search,
   } = req.query;
 
   const where: any = {};
@@ -248,7 +243,6 @@ adminRoutes.get('/products', async (req, res) => {
   return res.json({ products, total });
 });
 
-// GET /api/v1/admin/products/:id - Get single product with variants
 adminRoutes.get('/products/:id', async (req, res) => {
   const product = await prisma.product.findUnique({
     where: { id: req.params.id },
@@ -271,16 +265,14 @@ adminRoutes.get('/products/:id', async (req, res) => {
   return res.json({ product });
 });
 
-// POST /api/v1/admin/products - Create product
 adminRoutes.post('/products', async (req, res) => {
   try {
-    // Basic pre-mapping for common frontend fields
     const body = { ...req.body };
+
     if (body.price !== undefined && body.basePrice === undefined) {
       body.basePrice = body.price;
     }
-    
-    // Auto-generate slug if missing
+
     if (!body.slug && body.name) {
       body.slug = body.name
         .toLowerCase()
@@ -290,7 +282,6 @@ adminRoutes.post('/products', async (req, res) => {
         .trim();
     }
 
-    // Clean up empty strings for optional relations
     if (body.brandId === '') body.brandId = undefined;
     if (body.categoryId === '') body.categoryId = undefined;
 
@@ -299,6 +290,7 @@ adminRoutes.post('/products', async (req, res) => {
     if (bodyCleaned.categoryId === '') bodyCleaned.categoryId = undefined;
 
     const data = productCreateSchema.parse(bodyCleaned);
+
     const product = await prisma.product.create({
       data: {
         ...data,
@@ -314,20 +306,23 @@ adminRoutes.post('/products', async (req, res) => {
         category: true,
       },
     });
+
     return res.status(201).json({ product });
   } catch (error: any) {
     console.error('Product Creation Error:', error);
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
+
     return res.status(400).json({ error: error?.message || 'Failed to create product' });
   }
 });
 
-// PATCH /api/v1/admin/products/:id - Update product
 adminRoutes.patch('/products/:id', async (req, res) => {
   try {
     const data = productUpdateSchema.parse(req.body);
+
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data: {
@@ -342,6 +337,7 @@ adminRoutes.patch('/products/:id', async (req, res) => {
         category: true,
       },
     });
+
     return res.json({ product });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -351,13 +347,13 @@ adminRoutes.patch('/products/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/v1/admin/products/:id - Archive product (soft delete)
 adminRoutes.delete('/products/:id', async (req, res) => {
   try {
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data: { status: 'ARCHIVED' },
     });
+
     return res.json({ message: 'Product archived', product });
   } catch {
     return res.status(404).json({ error: 'Product not found' });
@@ -365,37 +361,33 @@ adminRoutes.delete('/products/:id', async (req, res) => {
 });
 
 // ─── Product Image Management ─────────────────────────────────────────────────
-
-// POST /api/v1/admin/products/:id/images - Upload multiple images
-interface CloudinaryFile extends Express.Multer.File {
+type CloudinaryFile = {
   path: string;
-}
+};
 
 adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req, res) => {
   try {
     const productId = req.params.id;
-    const files = req.files as CloudinaryFile[];
+    const files = (req.files as CloudinaryFile[]) || [];
 
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No images uploaded' });
     }
 
-    // Check if product exists
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      include: { images: true }
+      include: { images: true },
     });
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Create image records
     const imageData = files.map((file, index) => ({
       productId,
       url: file.path,
       altText: product.name,
-      isPrimary: product.images.length === 0 && index === 0, // Set first image as primary if none exist
+      isPrimary: product.images.length === 0 && index === 0,
       sortOrder: product.images.length + index,
     }));
 
@@ -405,22 +397,22 @@ adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req,
 
     const updatedImages = await prisma.productImage.findMany({
       where: { productId },
-      orderBy: { sortOrder: 'asc' }
+      orderBy: { sortOrder: 'asc' },
     });
 
     return res.status(201).json({ images: updatedImages });
   } catch (error: any) {
     console.error('Upload Error:', error);
-    return res.status(500).json({ 
-      error: 'Failed to upload images', 
-      details: error?.message || 'Unknown server error' 
+    return res.status(500).json({
+      error: 'Failed to upload images',
+      details: error?.message || 'Unknown server error',
     });
   }
 });
 
-// POST /api/v1/admin/products/:id/images/:imageId/primary - Set primary image
 adminRoutes.post('/products/:id/images/:imageId/primary', async (req, res) => {
   const { id, imageId } = req.params;
+
   try {
     const result = await prisma.$transaction([
       prisma.productImage.updateMany({
@@ -432,6 +424,7 @@ adminRoutes.post('/products/:id/images/:imageId/primary', async (req, res) => {
         data: { isPrimary: true },
       }),
     ]);
+
     return res.json({ message: 'Primary image updated', result });
   } catch (error: any) {
     console.error('Set Primary Error:', error);
@@ -439,12 +432,11 @@ adminRoutes.post('/products/:id/images/:imageId/primary', async (req, res) => {
   }
 });
 
-// DELETE /api/v1/admin/products/:productId/images/:imageId - Delete image
 adminRoutes.delete('/products/:productId/images/:imageId', async (req, res) => {
   try {
     const { productId, imageId } = req.params;
 
-    const image = await prisma.productImage.findUnique({
+    const image = await prisma.productImage.findFirst({
       where: { id: imageId, productId },
     });
 
@@ -452,32 +444,27 @@ adminRoutes.delete('/products/:productId/images/:imageId', async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    // Delete from Cloudinary
-    // Extract public_id from URL
-    // URL format: https://res.cloudinary.com/[id]/image/upload/v[version]/[path]/[filename].[ext]
     const urlParts = image.url.split('/');
     const folderIndex = urlParts.indexOf('accessomart');
     const publicIdWithExt = urlParts.slice(folderIndex).join('/');
-    const publicId = publicIdWithExt.replace(/\.[^/.]+$/, "");
+    const publicId = publicIdWithExt.replace(/\.[^/.]+$/, '');
 
     await cloudinary.uploader.destroy(publicId);
 
-    // Delete from DB
     await prisma.productImage.delete({
       where: { id: imageId },
     });
 
-    // If it was primary, set another one as primary
     if (image.isPrimary) {
       const nextImage = await prisma.productImage.findFirst({
         where: { productId },
-        orderBy: { sortOrder: 'asc' }
+        orderBy: { sortOrder: 'asc' },
       });
 
       if (nextImage) {
         await prisma.productImage.update({
           where: { id: nextImage.id },
-          data: { isPrimary: true }
+          data: { isPrimary: true },
         });
       }
     }
@@ -489,31 +476,27 @@ adminRoutes.delete('/products/:productId/images/:imageId', async (req, res) => {
   }
 });
 
-// PATCH /api/v1/admin/products/:productId/images/:imageId/primary - Set primary
 adminRoutes.patch('/products/:productId/images/:imageId/primary', async (req, res) => {
   try {
     const { productId, imageId } = req.params;
 
-    // Reset all images for this product to non-primary
     await prisma.productImage.updateMany({
       where: { productId },
-      data: { isPrimary: false }
+      data: { isPrimary: false },
     });
 
-    // Set target image as primary
     const image = await prisma.productImage.update({
-      where: { id: imageId, productId },
-      data: { isPrimary: true }
+      where: { id: imageId },
+      data: { isPrimary: true },
     });
 
     return res.json({ image });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to update primary image' });
   }
 });
 
 // ─── Product Variants & Inventory ─────────────────────────────────────────────
-
 const variantCreateSchema = z.object({
   productId: z.string(),
   sku: z.string().min(1),
@@ -523,11 +506,10 @@ const variantCreateSchema = z.object({
   attributes: z.record(z.any()).default({}),
   imageUrl: z.string().url().optional(),
   isActive: z.boolean().default(true),
-  quantity: z.number().int().min(0).default(0), // initial stock
+  quantity: z.number().int().min(0).default(0),
   lowStockThreshold: z.number().int().min(0).default(5),
 });
 
-// POST /api/v1/admin/variants - Create variant with inventory
 adminRoutes.post('/variants', async (req, res) => {
   try {
     const data = variantCreateSchema.parse(req.body);
@@ -571,16 +553,15 @@ adminRoutes.post('/variants', async (req, res) => {
   }
 });
 
-// PATCH /api/v1/admin/variants/:id - Update variant
 adminRoutes.patch('/variants/:id', async (req, res) => {
   try {
     const { quantity, lowStockThreshold, ...variantData } = req.body;
+
     const variant = await prisma.productVariant.update({
       where: { id: req.params.id },
       data: variantData,
     });
 
-    // Update inventory if quantity or threshold provided
     if (quantity !== undefined || lowStockThreshold !== undefined) {
       await prisma.inventory.update({
         where: { variantId: req.params.id },
@@ -602,9 +583,8 @@ adminRoutes.patch('/variants/:id', async (req, res) => {
   }
 });
 
-// PATCH /api/v1/admin/inventory/:variantId - Update inventory stock
 adminRoutes.patch('/inventory/:variantId', async (req, res) => {
-  const { quantity, operation } = req.body; // operation: 'set' or 'adjust'
+  const { quantity, operation } = req.body;
 
   try {
     const inventory = await prisma.inventory.findUnique({
@@ -616,6 +596,7 @@ adminRoutes.patch('/inventory/:variantId', async (req, res) => {
     }
 
     let newQuantity = inventory.quantity;
+
     if (operation === 'set') {
       newQuantity = quantity;
     } else if (operation === 'adjust') {
@@ -636,50 +617,44 @@ adminRoutes.patch('/inventory/:variantId', async (req, res) => {
   }
 });
 
-// GET /api/v1/admin/inventory - Get all inventory items
-adminRoutes.get('/inventory', async (req, res) => {
+adminRoutes.get('/inventory', async (_req, res) => {
   const inventoryItems = await prisma.inventory.findMany({
-    include: { 
-      variant: { 
-        include: { 
-          product: { 
-            include: { brand: true } 
-          } 
-        } 
-      } 
+    include: {
+      variant: {
+        include: {
+          product: {
+            include: { brand: true },
+          },
+        },
+      },
     },
     orderBy: { variant: { sku: 'asc' } },
   });
+
   return res.json({ inventoryItems });
 });
 
-// GET /api/v1/admin/inventory/low-stock - Get low stock items
-adminRoutes.get('/inventory/low-stock', async (req, res) => {
-  // Use a raw-ish threshold check if fields reference fails
+adminRoutes.get('/inventory/low-stock', async (_req, res) => {
   const lowStockItems = await prisma.inventory.findMany({
     where: {
-      OR: [
-        { quantity: { lte: 5 } }, // Hardcoded fallback or use a more complex query
-        // Properly referencing the column with a simpler filter if possible
-      ]
+      OR: [{ quantity: { lte: 5 } }],
     },
-    include: { 
-      variant: { 
-        include: { 
-          product: { 
-            include: { brand: true } 
-          } 
-        } 
-      } 
+    include: {
+      variant: {
+        include: {
+          product: {
+            include: { brand: true },
+          },
+        },
+      },
     },
     orderBy: { quantity: 'asc' },
   });
+
   return res.json({ lowStockItems });
 });
 
 // ─── Admin Order Management ───────────────────────────────────────────────────
-
-// PATCH /api/v1/admin/orders/:id/status - Update order status
 adminRoutes.patch('/orders/:id/status', async (req, res) => {
   const { status } = req.body;
 
@@ -691,7 +666,6 @@ adminRoutes.patch('/orders/:id/status', async (req, res) => {
   try {
     const updateData: any = { status };
 
-    // Set timestamps based on status
     if (status === 'SHIPPED') {
       updateData.shippedAt = new Date();
     } else if (status === 'DELIVERED') {
@@ -717,7 +691,6 @@ adminRoutes.patch('/orders/:id/status', async (req, res) => {
   }
 });
 
-// GET /api/v1/admin/orders/:id - Get single order with full details
 adminRoutes.get('/orders/:id', async (req, res) => {
   const order = await prisma.order.findUnique({
     where: { id: req.params.id },
@@ -737,8 +710,6 @@ adminRoutes.get('/orders/:id', async (req, res) => {
 });
 
 // ─── Admin Customer Details ───────────────────────────────────────────────────
-
-// GET /api/v1/admin/customers/:id - Get customer with orders
 adminRoutes.get('/customers/:id', async (req, res) => {
   const customer = await prisma.user.findUnique({
     where: { id: req.params.id, role: 'CUSTOMER' },
