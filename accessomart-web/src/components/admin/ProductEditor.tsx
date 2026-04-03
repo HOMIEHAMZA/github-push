@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, X, Save, Wand2 } from 'lucide-react';
 import { ApiProduct, ApiBrand, ApiCategory, ApiProductImage } from '@/lib/api-types';
 import { ImageUploader } from './ImageUploader';
+import { adminApi } from '@/lib/api-client';
 
 interface ProductEditorProps {
   product: Partial<ApiProduct> | null;
@@ -56,6 +57,27 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       setIsSlugManual(!!(product.id && product.slug));
     }
   }, [product]);
+
+  // When editing an existing product, fetch full details so we get ALL images
+  // (the products list only returns 1 thumbnail image per product for performance)
+  useEffect(() => {
+    if (!isEditing || !product?.id) return;
+
+    let cancelled = false;
+    adminApi.getProduct(product.id).then(res => {
+      if (cancelled) return;
+      const fullImages = res.product?.images || [];
+      if (fullImages.length > 0) {
+        setFormData(prev => ({ ...prev, images: fullImages }));
+      }
+    }).catch(err => {
+      console.warn('Could not fetch full product images:', err);
+    });
+
+    return () => { cancelled = true; };
+  // Only run when opening the editor for a specific product id
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id]);
 
   const handleUpdateImages = useCallback((newImages: ApiProductImage[]) => {
     setFormData(prev => ({ ...prev, images: newImages }));

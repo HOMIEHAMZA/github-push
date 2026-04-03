@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ProductEditor } from '@/components/admin/ProductEditor';
 import { ApiProduct, ApiBrand, ApiCategory } from '@/lib/api-types';
-
+import Image from 'next/image';
 
 export default function ProductManager() {
   const { addToast } = useToastStore();
@@ -70,11 +70,15 @@ export default function ProductManager() {
 
     try {
       if (isEditing && editingProduct?.id) {
-        // Optimistic Update
-        const updatedProduct = { ...editingProduct, ...formData } as ApiProduct;
-        setProducts(prev => prev.map(p => p.id === editingProduct.id ? updatedProduct : p));
+        // Strip image/variant arrays — these are managed by their own endpoints
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { images: _images, variants: _variants, brand: _brand, category: _category, ...saveData } = formData as ApiProduct;
+
+        // Optimistic update with existing data while we wait for API
+        const optimistic = { ...editingProduct, ...saveData } as ApiProduct;
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? optimistic : p));
         
-        await adminApi.updateProduct(editingProduct.id, formData);
+        await adminApi.updateProduct(editingProduct.id, saveData);
         addToast('Asset parameters updated', 'success');
         setEditingProduct(null);
       } else {
@@ -84,7 +88,7 @@ export default function ProductManager() {
         setIsAdding(false);
       }
       
-      // Always refresh to sync with server-side computed fields
+      // Always refresh to sync with server-side computed fields and images
       fetchProducts();
     } catch (error) {
       const err = error as Error;
@@ -228,11 +232,14 @@ export default function ProductManager() {
                     <tr key={product.id} className="group hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 rounded-xl bg-black border border-white/5 flex items-center justify-center overflow-hidden">
-                            <img 
+                          <div className="w-12 h-12 rounded-xl bg-black border border-white/5 flex items-center justify-center overflow-hidden relative">
+                            <Image 
                               src={primaryImage} 
                               alt={`${product.name} visual asset`} 
-                              className="w-full h-full object-contain p-2" 
+                              fill
+                              sizes="48px"
+                              className="object-contain p-1.5" 
+                              unoptimized={primaryImage.startsWith('/images/')}
                             />
                           </div>
                           <div>

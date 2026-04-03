@@ -230,7 +230,9 @@ adminRoutes.get('/products', async (req, res) => {
       include: {
         brand: true,
         category: true,
-        images: { take: 1, where: { isPrimary: true } },
+        // Fetch primary image first, fall back to first by sortOrder so thumbnails work
+        // before a primary image is designated
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }], take: 1 },
         variants: {
           include: { inventory: true },
         },
@@ -289,31 +291,76 @@ adminRoutes.post('/products', async (req, res) => {
     const bodyCleaned = { ...body };
     if (bodyCleaned.brandId === '') bodyCleaned.brandId = undefined;
     if (bodyCleaned.categoryId === '') bodyCleaned.categoryId = undefined;
+    // Strip client-sent images array — images are managed separately via upload endpoints
+    delete bodyCleaned.images;
 
     const data = productCreateSchema.parse(bodyCleaned);
+    const slug = data.slug || bodyCleaned.slug || body.name.toLowerCase().replace(/\s+/g, '-');
 
-    const product = await prisma.product.create({
-      data: {
-        ...data,
-        slug: data.slug || bodyCleaned.slug,
-        basePrice: data.basePrice,
-        comparePrice: data.comparePrice,
-        costPrice: data.costPrice,
-        weight: data.weight,
-        status: data.status || 'DRAFT',
-      } as any,
+    // Create product + default variant + inventory in one transaction so the
+    // product appears in inventory immediately without manual intervention.
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          ...data,
+          slug,
+          status: data.status || 'DRAFT',
+        } as any,
+        include: {
+          brand: true,
+          category: true,
+          images: true,
+          variants: { include: { inventory: true } },
+        },
+      });
+
+      // Auto-create a default "Standard" variant so inventory tracking works
+      // immediately. SKU format: slug-default (truncated to stay unique)
+      const skuBase = slug.replace(/[^a-z0-9-]/g, '').substring(0, 40);
+      const defaultVariant = await tx.productVariant.create({
+        data: {
+          productId: created.id,
+          sku: `${skuBase}-default`,
+          name: 'Standard',
+          price: data.basePrice,
+          isActive: true,
+        },
+      });
+
+      // Create the inventory record for the default variant
+      await tx.inventory.create({
+        data: {
+          variantId: defaultVariant.id,
+          quantity: 0,
+          lowStockThreshold: 5,
+        },
+      });
+
+      return created;
+    });
+
+    // Re-fetch to include the newly created variant + inventory
+    const productWithVariants = await prisma.product.findUnique({
+      where: { id: product.id },
       include: {
         brand: true,
         category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: { include: { inventory: true } },
       },
     });
 
-    return res.status(201).json({ product });
+    return res.status(201).json({ product: productWithVariants });
   } catch (error: any) {
     console.error('Product Creation Error:', error);
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+
+    // Duplicate slug produces a unique constraint error — give a readable message
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('slug')) {
+      return res.status(400).json({ error: 'A product with this slug already exists. Change the name or set a custom slug.' });
     }
 
     return res.status(400).json({ error: error?.message || 'Failed to create product' });
@@ -324,6 +371,15 @@ adminRoutes.patch('/products/:id', async (req, res) => {
   try {
     const body = { ...req.body };
     
+    // Strip non-schema fields that the frontend might accidentally send
+    delete body.images;
+    delete body.variants;
+    delete body.brand;
+    delete body.category;
+    delete body.id;
+    delete body.createdAt;
+    delete body.updatedAt;
+
     // Normalize empty strings to null for optional FK and text fields
     const optionalStringFields = ['brandId', 'categoryId', 'description', 'shortDesc', 'metaTitle', 'metaDesc', 'slug'];
     optionalStringFields.forEach(field => {
@@ -336,9 +392,6 @@ adminRoutes.patch('/products/:id', async (req, res) => {
       if (body[field] === '' || body[field] === null) body[field] = undefined;
     });
 
-    // Log incoming body for debugging
-    console.log('[Admin PATCH /products/:id] body:', JSON.stringify(body));
-
     const data = productUpdateSchema.parse(body);
 
     const product = await prisma.product.update({
@@ -347,7 +400,8 @@ adminRoutes.patch('/products/:id', async (req, res) => {
       include: {
         brand: true,
         category: true,
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+        variants: { include: { inventory: true } },
       },
     });
 
