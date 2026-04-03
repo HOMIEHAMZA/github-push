@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { validate } from '../middleware/validate.middleware';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { loginLimiter } from '../middleware/rate-limit.middleware';
 
 export const authRoutes = Router();
 
@@ -40,7 +41,7 @@ function generateTokens(userId: string, role: string) {
 }
 
 // ─── POST /api/v1/auth/register ───────────────────────────────────────────────
-authRoutes.post('/register', validate(registerSchema), async (req, res) => {
+authRoutes.post('/register', loginLimiter, validate(registerSchema), async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body;
 
@@ -72,7 +73,7 @@ authRoutes.post('/register', validate(registerSchema), async (req, res) => {
 });
 
 // ─── POST /api/v1/auth/login ──────────────────────────────────────────────────
-authRoutes.post('/login', validate(loginSchema), async (req, res) => {
+authRoutes.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 

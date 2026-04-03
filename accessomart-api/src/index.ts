@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+import { apiLimiter } from './middleware/rate-limit.middleware';
 
 // Route imports
 import { authRoutes } from './routes/auth.routes';
@@ -29,25 +29,6 @@ app.use(cors({
   credentials: true,
 }));
 
-// ─── Rate Limiting ─────────────────────────────────────────────────────────────
-const isProd = process.env.NODE_ENV === 'production';
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProd ? 100 : 2000, // Strict limit in production, generous in dev
-  message: { error: 'Too many requests. Slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProd ? 10 : 200, // Very strict for authentication attempts
-  message: { error: 'Too many auth attempts. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 // ─── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -70,7 +51,7 @@ app.get('/health', (_req, res) => {
 // ─── API Routes ────────────────────────────────────────────────────────────────
 const API = '/api/v1';
 
-app.use(`${API}/auth`, authLimiter, authRoutes);
+app.use(`${API}/auth`, apiLimiter, authRoutes);
 app.use(`${API}/products`, apiLimiter, productRoutes);
 // app.use(`${API}/categories`, apiLimiter, categoryRoutes);
 app.use(`${API}/orders`, apiLimiter, orderRoutes);
