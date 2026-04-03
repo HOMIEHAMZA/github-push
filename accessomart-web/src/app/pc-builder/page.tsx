@@ -30,7 +30,7 @@ export default function PCBuilderPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-cyan-500/5 to-transparent pointer-events-none" />
         <div className="container mx-auto px-6">
           <div className="flex flex-col items-center text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-bold text-cyan-400 uppercase tracking-[0.2em] animate-pulse">
+            <div className="inline-flex items-center gap-2 animate-pulse rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
               <Zap size={12} />
               SYSTEM CONFIGURATOR V1.0
             </div>
@@ -58,16 +58,16 @@ export default function PCBuilderPage() {
             {/* Mobile Category Scroll (Visible only on mobile) */}
             <div className="lg:hidden -mx-6 px-6 pb-4 overflow-x-auto custom-scrollbar flex gap-3">
               {builderCategories.map((cat) => (
-                <button
-                   key={cat}
-                   onClick={() => setActiveCategory(cat)}
-                   className={`
-                     whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all
-                     ${activeCategory === cat ? 'bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'bg-white/5 text-white/40 border-white/5 hover:border-white/10'}
-                   `}
-                >
-                  {cat}
-                </button>
+                 <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`
+                      whitespace-nowrap rounded-xl border px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all
+                      ${activeCategory === cat ? 'border-cyan-500 bg-cyan-500 text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'border-white/5 bg-white/5 text-white/40 hover:border-white/10'}
+                    `}
+                 >
+                   {cat}
+                 </button>
                ))}
             </div>
 
@@ -122,15 +122,15 @@ export default function PCBuilderPage() {
       {/* Feature Footer */}
       <section className="bg-white/[0.02] border-t border-white/5 py-12">
         <div className="container mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-           <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto md:mx-0">
-                 <ShieldCheck className="text-cyan-400" size={24} />
-              </div>
-              <h4 className="text-sm font-bold text-white uppercase tracking-widest">Technician Verified</h4>
-              <p className="text-xs text-on-surface-variant leading-relaxed opacity-60">
-                 Every selection is cross-referenced with manufacturer specifications to ensure 100% operational synergy.
-              </p>
-           </div>
+            <div className="space-y-4">
+               <div className="flex items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 w-12 h-12 mx-auto md:mx-0">
+                  <ShieldCheck className="text-cyan-400" size={24} />
+               </div>
+               <h4 className="text-sm font-bold uppercase tracking-widest text-white">Technician Verified</h4>
+               <p className="text-xs leading-relaxed opacity-60 text-on-surface-variant">
+                  Every selection is cross-referenced with manufacturer specifications to ensure 100% operational synergy.
+               </p>
+            </div>
            {/* Add more features if needed */}
         </div>
       </section>

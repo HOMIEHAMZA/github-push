@@ -109,8 +109,8 @@ export default function ContactSupport() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-display font-bold tracking-widest text-on-surface-variant uppercase ml-1">Transmission Subject</label>
-              <select className="w-full bg-surface-container-low border border-surface-container-highest rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-on-surface transition-all">
+              <label htmlFor="subject" className="text-xs font-display font-bold tracking-widest text-on-surface-variant uppercase ml-1">Transmission Subject</label>
+              <select id="subject" className="w-full bg-surface-container-low border border-surface-container-highest rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-on-surface transition-all">
                 <option>Technical Support</option>
                 <option>Order Inquiries</option>
                 <option>Product Inquiries</option>

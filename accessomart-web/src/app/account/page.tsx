@@ -56,7 +56,7 @@ export default function AccountDashboard() {
     <div className="space-y-8">
       {/* Error State */}
       {error && (
-        <div className="p-6 bg-red-400/5 border border-red-400/20 rounded-2xl flex flex-col items-center text-center space-y-4">
+        <div className="flex flex-col items-center space-y-4 rounded-2xl border border-red-400/20 bg-red-400/5 p-6 text-center">
           <AlertCircle className="w-12 h-12 text-red-400" />
           <div>
             <h3 className="text-lg font-bold text-red-400">System Link Failure</h3>
@@ -64,7 +64,7 @@ export default function AccountDashboard() {
           </div>
           <button 
             onClick={() => fetchData()}
-            className="px-6 py-2 bg-red-400 text-black font-bold rounded-lg hover:bg-red-500 transition-colors"
+            className="rounded-lg bg-red-400 px-6 py-2 font-bold text-black transition-colors hover:bg-red-500"
           >
             Retry Connection
           </button>
@@ -74,12 +74,12 @@ export default function AccountDashboard() {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat) => (
-          <div key={stat.label} className="p-6 bg-[#111] border border-white/5 rounded-2xl flex items-center space-x-4">
+          <div key={stat.label} className="flex items-center space-x-4 rounded-2xl border border-white/5 bg-[#111] p-6">
             <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
               <stat.icon className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-white/40 font-medium uppercase tracking-wider">{stat.label}</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-white/40">{stat.label}</p>
               <p className="text-2xl font-bold">{stat.value}</p>
             </div>
           </div>
@@ -105,9 +105,9 @@ export default function AccountDashboard() {
             ) : recentOrders.length > 0 ? (
               <div className="space-y-4">
                 {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/2 overflow-hidden transition-all hover:border-[#00f2ff]/30">
+                  <div key={order.id} className="flex items-center justify-between overflow-hidden rounded-xl border border-white/2 bg-white/5 p-4 transition-all hover:border-[#00f2ff]/30">
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-lg bg-[#222] flex items-center justify-center border border-white/5">
+                      <div className="flex items-center justify-center rounded-lg border border-white/5 bg-[#222] w-10 h-10">
                         <TrendingUp className="w-5 h-5 text-[#00f2ff]" />
                       </div>
                       <div>
