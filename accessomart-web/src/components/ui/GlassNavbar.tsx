@@ -46,9 +46,9 @@ export function GlassNavbar() {
         
         {/* Utility / Cart */}
         <div className="flex items-center space-x-6">
-          <button className="text-on-surface-variant hover:text-primary transition-colors focus:outline-none">
+          <Link href="/products" className="text-on-surface-variant hover:text-primary transition-colors focus:outline-none">
             <Search className="w-6 h-6" strokeWidth={1.5} />
-          </button>
+          </Link>
           
           <button 
             onClick={openDrawer}

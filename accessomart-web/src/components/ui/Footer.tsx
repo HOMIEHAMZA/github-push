@@ -1,7 +1,10 @@
+'use client';
 import React from 'react';
 import Link from 'next/link';
 
 export function Footer() {
+  const [subscribed, setSubscribed] = React.useState(false);
+
   return (
     <footer className="bg-surface-container-lowest pt-20 pb-10 border-t border-surface-container mt-auto">
       <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -39,16 +42,31 @@ export function Footer() {
           <p className="text-on-surface-variant text-sm mb-4">
             Join our newsletter for early access to legendary drops and exclusive gear.
           </p>
-          <div className="flex w-full">
-            <input 
-              type="email" 
-              placeholder="YOUR EMAIL" 
-              className="bg-surface-container font-sans text-sm outline-none px-4 py-3 rounded-l-xl border border-r-0 border-surface-container-highest focus:border-primary/50 text-on-surface w-full placeholder:text-surface-variant tracking-widest"
-            />
-            <button className="bg-primary text-on-primary font-bold px-4 py-3 rounded-r-xl tracking-widest hover:brightness-110 transition-all">
-              JOIN
-            </button>
-          </div>
+          {!subscribed ? (
+            <form 
+              onSubmit={(e) => { e.preventDefault(); setSubscribed(true); }}
+              className="flex w-full"
+            >
+              <input 
+                type="email" 
+                required
+                placeholder="YOUR EMAIL" 
+                className="bg-surface-container font-sans text-sm outline-none px-4 py-3 rounded-l-xl border border-r-0 border-surface-container-highest focus:border-primary/50 text-on-surface w-full placeholder:text-surface-variant tracking-widest"
+              />
+              <button 
+                type="submit"
+                className="bg-primary text-on-primary font-bold px-4 py-3 rounded-r-xl tracking-widest hover:brightness-110 transition-all uppercase text-[10px]"
+              >
+                JOIN
+              </button>
+            </form>
+          ) : (
+            <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl text-center">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] animate-pulse">
+                PROTOCOL JOINED
+              </p>
+            </div>
+          )}
         </div>
       </div>
       

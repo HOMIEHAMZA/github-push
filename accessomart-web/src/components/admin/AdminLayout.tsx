@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/useAuthStore';
 import { AdminSidebar } from './AdminSidebar';
 
 interface AdminLayoutProps {
@@ -9,13 +11,24 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, activeItem }: AdminLayoutProps) {
+  const router = useRouter();
+  const { user, isAuthenticated, isGuest } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // Safety check: Redirect if not authenticated, or guest, or not admin
+    if (mounted) {
+      if (!isAuthenticated || isGuest() || user?.role !== 'ADMIN') {
+        router.push('/');
+      }
+    }
+  }, [mounted, isAuthenticated, isGuest, user, router]);
 
-  if (!mounted) return null;
+  if (!mounted || !isAuthenticated || isGuest() || user?.role !== 'ADMIN') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 flex text-zinc-100 selection:bg-primary/30 selection:text-primary-light">
