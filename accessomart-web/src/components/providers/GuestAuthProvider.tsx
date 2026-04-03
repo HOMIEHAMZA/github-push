@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -11,26 +12,33 @@ import { useAuthStore } from '@/store/useAuthStore';
  * the user through a login screen prematurely.
  */
 export function GuestAuthProvider({ children }: { children: React.ReactNode }) {
-  const [isInitializing, setIsInitializing] = useState(true);
+  const pathname = usePathname();
   const initializeCart = useCartStore((state) => state.initializeCart);
   
   // To avoid infinite loops in strict mode
   const initialized = useRef(false);
 
   useEffect(() => {
+    // ─── AUTH PAGE PROTECTION ──────────────────────────────────────────────────
+    // Do NOT attempt guest auto-registration if the user is explicitly
+    // on a real login or register page. This avoids rate-limiting conflicts 
+    // and store "loading" states from interfering with the real user credentials.
+    const isAuthPage = pathname === '/login' || pathname === '/register' || pathname?.startsWith('/admin');
+    
     async function setupGuestSession() {
-      if (initialized.current) return;
+      if (initialized.current || isAuthPage) {
+        return;
+      }
       initialized.current = true;
       
       try {
         const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
         
         if (token) {
-          // Already have a session, fetch the cart normally
-          // Also fetchme to populate auth store
-          await useAuthStore.getState().fetchMe();
+          // Already have a session, fetch profile and cart normally
+          // Using silent: true to prevent global loading indicators for background restoration
+          await useAuthStore.getState().fetchMe({ silent: true });
           await initializeCart();
-          setIsInitializing(false);
           return;
         }
 
@@ -39,25 +47,23 @@ export function GuestAuthProvider({ children }: { children: React.ReactNode }) {
         const guestEmail = `guest_${guestId}@accessomart.com`;
         const guestPassword = `TempPassword!${guestId}`;
 
-        // Attempt registration via auth store
+        // Attempt background registration
         await useAuthStore.getState().register({
           firstName: 'Guest',
           lastName: 'User',
           email: guestEmail,
           password: guestPassword,
-        });
+        }, { silent: true });
 
         // Fetch cart via Zustand store after auth setup
         await initializeCart();
       } catch (error) {
         console.error('[GuestAuth] Initialization error:', error);
-      } finally {
-        setIsInitializing(false);
       }
     }
 
     setupGuestSession();
-  }, [initializeCart]);
+  }, [initializeCart, pathname]);
 
   // Optionally block rendering the app until the guest token is obtained,
   // but to preserve speed, we yield children immediately and components

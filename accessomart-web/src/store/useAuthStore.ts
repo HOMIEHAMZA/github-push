@@ -3,6 +3,10 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { authApi } from '@/lib/api-client';
 import { ApiUser } from '@/lib/api-types';
 
+interface AuthOptions {
+  silent?: boolean;
+}
+
 interface AuthState {
   user: ApiUser | null;
   isLoading: boolean;
@@ -10,15 +14,15 @@ interface AuthState {
   isAuthenticated: boolean;
   isGuest: () => boolean;
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, options?: AuthOptions) => Promise<void>;
   register: (data: {
     firstName: string;
     lastName: string;
     email: string;
     password: string;
-  }) => Promise<void>;
+  }, options?: AuthOptions) => Promise<void>;
   logout: () => Promise<void>;
-  fetchMe: () => Promise<void>;
+  fetchMe: (options?: AuthOptions) => Promise<void>;
   clearError: () => void;
 }
 
@@ -34,24 +38,30 @@ export const useAuthStore = create<AuthState>()(
         return !!user && (user.email.startsWith('guest_') || user.firstName === 'Guest');
       },
 
-      login: async (email, password) => {
-        set({ isLoading: true, error: null });
+      login: async (email, password, options) => {
+        if (!options?.silent) set({ isLoading: true, error: null });
         try {
           const { user } = await authApi.login(email, password);
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (err: any) {
-          set({ error: err.message || 'Login failed.', isLoading: false });
+        } catch (err) {
+          if (!options?.silent) set({ 
+            error: err instanceof Error ? err.message : 'Login failed.', 
+            isLoading: false 
+          });
           throw err;
         }
       },
 
-      register: async (data) => {
-        set({ isLoading: true, error: null });
+      register: async (data, options) => {
+        if (!options?.silent) set({ isLoading: true, error: null });
         try {
           const { user } = await authApi.register(data);
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (err: any) {
-          set({ error: err.message || 'Registration failed.', isLoading: false });
+        } catch (err) {
+          if (!options?.silent) set({ 
+            error: err instanceof Error ? err.message : 'Registration failed.', 
+            isLoading: false 
+          });
           throw err;
         }
       },
@@ -67,23 +77,23 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      fetchMe: async () => {
+      fetchMe: async (options) => {
         const token = typeof window !== 'undefined'
           ? localStorage.getItem('accessToken')
           : null;
         if (!token) return;
 
-        set({ isLoading: true, error: null });
+        if (!options?.silent) set({ isLoading: true, error: null });
         try {
           const { user } = await authApi.me();
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (err: any) {
+        } catch (err) {
           // Token expired or API offline/rate-limited
           set({ 
             user: null, 
             isAuthenticated: false, 
             isLoading: false, 
-            error: err.message || 'Session restoration failed'
+            error: err instanceof Error ? err.message : 'Session restoration failed'
           });
         }
       },
