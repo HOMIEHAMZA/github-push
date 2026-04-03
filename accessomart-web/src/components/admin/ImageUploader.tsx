@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Reorder } from 'framer-motion';
 import { Upload, X, Trash2, Star, Loader2, GripVertical } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -24,10 +24,14 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Debounce ref — only fire reorder API after drag settles
+  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep a snapshot of the pre-drag order so we can revert on error
+  const previousOrder = useRef<ApiProductImage[]>(images);
+
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
-    // Check limit
     if (images.length + files.length > 10) {
       setError('Maximum 10 images allowed per product');
       return;
@@ -42,10 +46,12 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
       onImagesChange(res.images);
     } catch (err: unknown) {
       console.error('Upload error details:', err);
-      const errorMessage = (err as { details?: Array<{ message: string }>; error?: string; message?: string })?.details?.[0]?.message 
-        || (err as { error?: string })?.error 
-        || (err as { message?: string })?.message 
-        || 'Failed to upload images';
+      const e = err as { details?: Array<{ message: string }>; error?: string; message?: string };
+      const errorMessage =
+        e?.details?.[0]?.message ||
+        e?.error ||
+        e?.message ||
+        'Failed to upload images';
       setError(errorMessage);
     } finally {
       setIsUploading(false);
@@ -91,17 +97,27 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
     }
   };
 
-  const handleReorder = async (newOrder: ApiProductImage[]) => {
-    // Optimistic local update
+  // Called on every drag frame — optimistic UI update only.
+  // API call is debounced to fire once dragging stops.
+  const handleReorder = (newOrder: ApiProductImage[]) => {
+    // Optimistic update
     onImagesChange(newOrder);
 
-    try {
-      const imageIds = newOrder.map(img => img.id);
-      await adminApi.reorderProductImages(productId, imageIds);
-    } catch (err: unknown) {
-      console.error('Reorder update failed:', err);
-      setError('Failed to save image order on server');
-    }
+    // Debounce the API call
+    if (reorderTimer.current) clearTimeout(reorderTimer.current);
+    reorderTimer.current = setTimeout(async () => {
+      try {
+        const imageIds = newOrder.map(img => img.id);
+        await adminApi.reorderProductImages(productId, imageIds);
+        // Update snapshot after successful save
+        previousOrder.current = newOrder;
+      } catch (err: unknown) {
+        console.error('Reorder save failed:', err);
+        setError('Failed to save image order — changes reverted');
+        // Revert to snapshot
+        onImagesChange(previousOrder.current);
+      }
+    }, 500);
   };
 
   return (
@@ -114,8 +130,8 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
         className={cn(
           "relative group cursor-pointer border-2 border-dashed rounded-xl p-8 transition-all duration-300",
           "bg-slate-900/50 backdrop-blur-sm",
-          isDragging 
-            ? "border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-cyan-500/5" 
+          isDragging
+            ? "border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-cyan-500/5"
             : "border-slate-700 hover:border-slate-500"
         )}
         onClick={() => document.getElementById('file-upload')?.click()}
@@ -146,80 +162,89 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
             {isUploading ? 'Uploading Circuitry...' : 'Upload Component Images'}
           </h3>
           <p className="text-sm text-slate-400 max-w-xs mb-4">
-            Drag and drop or click to upload. Power your product with crystal-clear visuals. (Max 10 images)
+            Drag files here or click to upload. Drag thumbnails below to reorder. (Max 10 images)
           </p>
         </div>
       </div>
 
-
       {error && (
         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
           <X className="w-4 h-4 shrink-0" />
-          {error}
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto hover:text-red-300 transition-colors" title="Dismiss error">
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
-      {/* Gallery Grid with Reordering */}
+      {/* Gallery Grid with Drag-to-Reorder */}
       {images.length > 0 && (
-        <Reorder.Group 
-          axis="x" 
-          values={images} 
-          onReorder={handleReorder}
-          className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6"
-        >
-          {images.map((image) => (
-            <Reorder.Item 
-              key={image.id}
-              value={image}
-              className={cn(
-                "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing",
-                image.isPrimary 
-                  ? "border-cyan-500 ring-2 ring-cyan-500/20" 
-                  : "border-slate-700 hover:border-cyan-500/50"
-              )}
-            >
-              <Image 
-                src={image.url} 
-                alt={image.altText || 'Product visual asset'} 
-                fill
-                sizes="(max-width: 768px) 50vw, 20vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-105 select-none"
-              />
-              
-              {/* Drag Handle Overlay (Visible on Hover) */}
-              <div className="absolute top-2 right-2 p-1 rounded bg-black/40 backdrop-blur-md text-white/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                <GripVertical className="w-4 h-4" />
-              </div>
-
-              {/* Badge for Primary */}
-              {image.isPrimary && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[10px] font-bold uppercase tracking-wider shadow-lg">
-                  Primary
-                </div>
-              )}
-
-              {/* Overlay Controls */}
-              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                {!image.isPrimary && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPrimary(image.id); }}
-                    className="p-2.5 rounded-full bg-slate-800/90 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-all transform hover:scale-110"
-                    title="Set as Primary"
-                  >
-                    <Star className="w-4 h-4" />
-                  </button>
+        <>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-widest px-1">
+            Drag thumbnails to reorder · Hover for controls
+          </p>
+          <Reorder.Group
+            axis="x"
+            values={images}
+            onReorder={handleReorder}
+            className="grid grid-cols-2 md:grid-cols-5 gap-4"
+          >
+            {images.map((image) => (
+              <Reorder.Item
+                key={image.id}
+                value={image}
+                className={cn(
+                  "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing select-none",
+                  image.isPrimary
+                    ? "border-cyan-500 ring-2 ring-cyan-500/20"
+                    : "border-slate-700 hover:border-cyan-500/50"
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); removeImage(image.id); }}
-                  className="p-2.5 rounded-full bg-slate-800/90 text-slate-200 hover:bg-red-500 transition-all transform hover:scale-110"
-                  title="Remove Image"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </Reorder.Item>
-          ))}
-        </Reorder.Group>
+                whileDrag={{ scale: 1.05, zIndex: 10, boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}
+              >
+                <Image
+                  src={image.url}
+                  alt={image.altText || 'Product visual asset'}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 20vw"
+                  className="object-cover pointer-events-none"
+                  draggable={false}
+                />
+
+                {/* Grip Icon */}
+                <div className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 backdrop-blur text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <GripVertical className="w-3.5 h-3.5" />
+                </div>
+
+                {/* Primary Badge */}
+                {image.isPrimary && (
+                  <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[9px] font-bold uppercase tracking-wider shadow">
+                    Primary
+                  </div>
+                )}
+
+                {/* Controls Overlay */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                  {!image.isPrimary && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPrimary(image.id); }}
+                      className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-all hover:scale-110"
+                      title="Set as Primary"
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeImage(image.id); }}
+                    className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-red-500 transition-all hover:scale-110"
+                    title="Remove Image"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </Reorder.Item>
+            ))}
+          </Reorder.Group>
+        </>
       )}
     </div>
   );

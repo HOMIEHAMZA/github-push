@@ -185,13 +185,14 @@ const productCreateSchema = z.object({
   shortDesc: z.string().nullable().optional(),
   brandId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
-  basePrice: z.number().positive(),
-  comparePrice: z.number().positive().nullable().optional(),
-  costPrice: z.number().positive().nullable().optional(),
+  // z.coerce.number() safely converts numeric strings (e.g. from HTML inputs) → numbers
+  basePrice: z.coerce.number().positive(),
+  comparePrice: z.coerce.number().positive().nullable().optional(),
+  costPrice: z.coerce.number().positive().nullable().optional(),
   status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVED']).default('DRAFT'),
-  isFeatured: z.boolean().default(false),
-  isDigital: z.boolean().default(false),
-  weight: z.number().nullable().optional(),
+  isFeatured: z.coerce.boolean().default(false),
+  isDigital: z.coerce.boolean().default(false),
+  weight: z.coerce.number().nullable().optional(),
   tags: z.array(z.string()).default([]),
   metaTitle: z.string().nullable().optional(),
   metaDesc: z.string().nullable().optional(),
@@ -323,35 +324,39 @@ adminRoutes.patch('/products/:id', async (req, res) => {
   try {
     const body = { ...req.body };
     
-    // Normalize empty strings to null for optional fields
-    const optionalFields = ['brandId', 'categoryId', 'description', 'shortDesc', 'metaTitle', 'metaDesc'];
-    optionalFields.forEach(field => {
+    // Normalize empty strings to null for optional FK and text fields
+    const optionalStringFields = ['brandId', 'categoryId', 'description', 'shortDesc', 'metaTitle', 'metaDesc', 'slug'];
+    optionalStringFields.forEach(field => {
       if (body[field] === '') body[field] = null;
     });
+
+    // Normalize empty numeric strings to undefined so they are skipped in partial update
+    const numericFields = ['comparePrice', 'costPrice', 'weight'];
+    numericFields.forEach(field => {
+      if (body[field] === '' || body[field] === null) body[field] = undefined;
+    });
+
+    // Log incoming body for debugging
+    console.log('[Admin PATCH /products/:id] body:', JSON.stringify(body));
 
     const data = productUpdateSchema.parse(body);
 
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: {
-        ...data,
-        basePrice: data.basePrice,
-        comparePrice: data.comparePrice,
-        costPrice: data.costPrice,
-        weight: data.weight,
-      } as any,
+      data: data as any,
       include: {
         brand: true,
         category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
       },
     });
 
     return res.json({ product });
   } catch (error: any) {
-    console.error('Product Update Error:', error);
+    console.error('[Admin PATCH /products/:id] Error:', JSON.stringify(error?.errors || error?.message || error));
     
     if (error instanceof z.ZodError) {
-      const details = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      const details = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
       return res.status(400).json({ error: 'Validation failed', details });
     }
     
@@ -537,14 +542,24 @@ adminRoutes.patch('/products/:productId/images/reorder', async (req, res) => {
     const { productId } = req.params;
     const { imageIds } = req.body;
 
-    if (!Array.isArray(imageIds)) {
-      return res.status(400).json({ error: 'imageIds must be an array' });
+    if (!Array.isArray(imageIds) || imageIds.length === 0) {
+      return res.status(400).json({ error: 'imageIds must be a non-empty array' });
     }
 
-    // Perform reordering in a transaction
+    // Verify all images belong to this product before reordering
+    const existingImages = await prisma.productImage.findMany({
+      where: { id: { in: imageIds }, productId },
+      select: { id: true },
+    });
+
+    if (existingImages.length !== imageIds.length) {
+      return res.status(400).json({ error: 'Some image IDs do not belong to this product' });
+    }
+
+    // Use updateMany per id — compound { id, productId } is NOT a unique key in Prisma
     await prisma.$transaction(
-      imageIds.map((id, index) =>
-        prisma.productImage.update({
+      imageIds.map((id: string, index: number) =>
+        prisma.productImage.updateMany({
           where: { id, productId },
           data: { sortOrder: index },
         })
@@ -558,7 +573,7 @@ adminRoutes.patch('/products/:productId/images/reorder', async (req, res) => {
 
     return res.json({ images: updatedImages });
   } catch (error: any) {
-    console.error('Image Reorder Error:', error);
+    console.error('[Admin] Image Reorder Error:', error);
     return res.status(500).json({ 
       error: 'Failed to reorder images', 
       details: error.message 

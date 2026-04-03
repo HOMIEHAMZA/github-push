@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Loader2, X, Save } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Loader2, X, Save, Wand2 } from 'lucide-react';
 import { ApiProduct, ApiBrand, ApiCategory, ApiProductImage } from '@/lib/api-types';
 import { ImageUploader } from './ImageUploader';
 
@@ -13,7 +13,16 @@ interface ProductEditorProps {
   onCancel: () => void;
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 export function ProductEditor({ product, brands, categories, onSave, onCancel }: ProductEditorProps) {
+  const isEditing = !!(product?.id);
+
   const [formData, setFormData] = useState({
     name: product?.name || '',
     slug: product?.slug || '',
@@ -22,13 +31,15 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     basePrice: product?.basePrice || 0,
     description: product?.description || '',
     status: product?.status || 'DRAFT',
-    images: product?.images || []
+    images: product?.images || [] as ApiProductImage[],
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isSlugModified, setIsSlugModified] = useState(!!product?.slug);
+  // For NEW products: slug tracks name auto-magically until user edits it manually.
+  // For EXISTING products: slug is already set; auto-sync is off by default.
+  const [isSlugManual, setIsSlugManual] = useState(isEditing && !!product?.slug);
 
-  // Sync internal state if product prop changes (e.g. when opening for a different product)
+  // Re-sync when the product prop changes (e.g. switching between edit modals)
   useEffect(() => {
     if (product) {
       setFormData({
@@ -39,24 +50,23 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         basePrice: product.basePrice || 0,
         description: product.description || '',
         status: product.status || 'DRAFT',
-        images: product.images || []
+        images: product.images || [],
       });
-      setIsSlugModified(!!product.slug);
+      // Treat existing slug as manually set so edits don't clobber it
+      setIsSlugManual(!!(product.id && product.slug));
     }
   }, [product]);
 
-  const handleUpdateImages = (newImages: ApiProductImage[]) => {
+  const handleUpdateImages = useCallback((newImages: ApiProductImage[]) => {
     setFormData(prev => ({ ...prev, images: newImages }));
-  };
+  }, []);
 
   const handleNameChange = (name: string) => {
     setFormData(prev => {
       const next = { ...prev, name };
-      if (!isSlugModified) {
-        next.slug = name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '');
+      // Auto-generate slug from name if user hasn't manually edited the slug field
+      if (!isSlugManual) {
+        next.slug = slugify(name);
       }
       return next;
     });
@@ -64,25 +74,41 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
 
   const handleSlugChange = (slug: string) => {
     setFormData(prev => ({ ...prev, slug }));
-    if (!isSlugModified) setIsSlugModified(true);
+    // Once the user types in the slug field, lock it from auto-updates
+    setIsSlugManual(true);
+  };
+
+  const resetSlugToAuto = () => {
+    setIsSlugManual(false);
+    setFormData(prev => ({ ...prev, slug: slugify(prev.name) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || (formData.basePrice === undefined || formData.basePrice <= 0)) return;
 
-    // Final slug fallback
-    const finalData = { ...formData };
-    if (!finalData.slug) {
-      finalData.slug = finalData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    }
+    if (!formData.name.trim()) return;
+    if (!formData.basePrice || formData.basePrice <= 0) return;
+
+    // Ensure slug is set
+    const finalSlug = formData.slug.trim() || slugify(formData.name);
+
+    // Build payload — convert empty strings for optional FKs to null
+    const payload: Partial<ApiProduct> = {
+      ...formData,
+      slug: finalSlug,
+      brandId: formData.brandId || null,
+      categoryId: formData.categoryId || null,
+      description: formData.description || null,
+      // Cast basePrice explicitly to number to guarantee correct type
+      basePrice: Number(formData.basePrice),
+    } as Partial<ApiProduct>;
 
     try {
       setIsSaving(true);
-      await onSave(finalData);
+      await onSave(payload);
     } catch (err) {
-      console.error('Submit Error:', err);
-      // Error is handled by parent's toast
+      console.error('ProductEditor submit error:', err);
+      // Error toasting is handled by the parent page
     } finally {
       setIsSaving(false);
     }
@@ -95,13 +121,13 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         <div className="px-8 py-6 border-b border-white/10 flex items-center justify-between bg-white/5">
           <div>
             <h2 className="text-xl font-bold text-white uppercase tracking-tight">
-              {product?.id ? 'Edit Asset Specs' : 'New Asset Specs'}
+              {isEditing ? 'Edit Asset Specs' : 'New Asset Specs'}
             </h2>
             <p className="text-xs text-zinc-500 uppercase tracking-widest mt-1">
-              {product?.id ? `ID: ${product.id}` : 'Initialize system parameters'}
+              {isEditing ? `ID: ${product?.id}` : 'Initialize system parameters'}
             </p>
           </div>
-          <button 
+          <button
             onClick={onCancel}
             className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-all"
             title="Close"
@@ -114,6 +140,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
           <form id="product-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
+              {/* Name */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Asset Name *</label>
                 <input
@@ -126,6 +153,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                 />
               </div>
 
+              {/* Brand + Category */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand</label>
@@ -157,22 +185,47 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                 </div>
               </div>
 
+              {/* Slug + Price + Status */}
               <div className="grid grid-cols-2 gap-4">
+                {/* Slug */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Asset Slug (Auto-gen if empty)</label>
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                      Slug
+                    </label>
+                    {isSlugManual && (
+                      <button
+                        type="button"
+                        onClick={resetSlugToAuto}
+                        className="text-[9px] text-primary hover:text-primary-light flex items-center gap-1 transition-colors"
+                        title="Reset to auto-generate from name"
+                      >
+                        <Wand2 size={10} />
+                        auto
+                      </button>
+                    )}
+                    {!isSlugManual && (
+                      <span className="text-[9px] text-zinc-600 italic">auto</span>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="e.g. gmmk-pro-white"
-                    className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all font-mono text-[10px]"
+                    placeholder="auto-generated-from-name"
+                    className={`w-full px-4 py-3 bg-black border rounded-xl text-white outline-none focus:border-primary transition-all font-mono text-[10px] ${
+                      isSlugManual ? 'border-primary/40' : 'border-white/10'
+                    }`}
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
                   />
                 </div>
+
+                {/* Base Price */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Base Price ($) *</label>
                   <input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     required
                     placeholder="0.00"
                     className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all"
@@ -180,7 +233,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                     onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
-                <div className="space-y-2">
+
+                {/* Status */}
+                <div className="space-y-2 col-span-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Terminal Status</label>
                   <select
                     className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all appearance-none"
@@ -195,25 +250,27 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                 </div>
               </div>
 
+              {/* Description */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">System Description</label>
                 <textarea
                   placeholder="Detailed asset specifications..."
-                  className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary min-h-[150px] transition-all"
+                  className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary min-h-[150px] transition-all resize-none"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
             </div>
 
+            {/* Images Panel */}
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Visual Assets</label>
-                {product?.id ? (
-                  <ImageUploader 
-                    productId={product.id} 
-                    images={formData.images} 
-                    onImagesChange={handleUpdateImages} 
+                {isEditing && product?.id ? (
+                  <ImageUploader
+                    productId={product.id}
+                    images={formData.images}
+                    onImagesChange={handleUpdateImages}
                   />
                 ) : (
                   <div className="p-8 border-2 border-dashed border-white/5 rounded-2xl bg-black/40 flex flex-col items-center justify-center text-center">
@@ -230,7 +287,8 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-3 bg-white/5 text-white text-xs font-bold rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest"
+            disabled={isSaving}
+            className="px-6 py-3 bg-white/5 text-white text-xs font-bold rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest disabled:opacity-50"
           >
             Abort
           </button>

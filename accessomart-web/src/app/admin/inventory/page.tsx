@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { adminApi } from '@/lib/api-client';
 import { useToastStore } from '@/store/useToastStore';
@@ -28,7 +28,7 @@ export default function InventoryManager() {
     const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
     const [adjustmentValue, setAdjustmentValue] = useState<Record<string, number>>({});
 
-    const fetchInventory = async () => {
+    const fetchInventory = useCallback(async () => {
         try {
             setLoading(true);
             const [invRes, lowRes] = await Promise.all([
@@ -43,11 +43,11 @@ export default function InventoryManager() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [addToast]);
 
     useEffect(() => {
         fetchInventory();
-    }, []);
+    }, [fetchInventory]);
 
     const handleAdjustInventory = async (variantId: string, operation: 'adjust' | 'set', value: number) => {
         try {
@@ -183,12 +183,20 @@ export default function InventoryManager() {
                     </div>
 
                     <div className="divide-y divide-white/5">
-                        {filteredInventory.length === 0 ? (
+                        {filteredInventory.length === 0 && inventory.length === 0 ? (
                             <div className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center justify-center">
                                     <Package className="text-zinc-700 mb-3" size={48} />
                                     <p className="text-zinc-500 text-sm">No inventory items found</p>
-                                    <p className="text-zinc-600 text-xs mt-1">Try adjusting your search or check back later</p>
+                                    <p className="text-zinc-600 text-xs mt-1">Add variants to your products to track inventory</p>
+                                </div>
+                            </div>
+                        ) : filteredInventory.length === 0 && searchTerm ? (
+                            <div className="px-6 py-12 text-center">
+                                <div className="flex flex-col items-center justify-center">
+                                    <Package className="text-zinc-700 mb-3" size={48} />
+                                    <p className="text-zinc-500 text-sm">No results for &quot;{searchTerm}&quot;</p>
+                                    <p className="text-zinc-600 text-xs mt-1">Try a different search term</p>
                                 </div>
                             </div>
                         ) : (
