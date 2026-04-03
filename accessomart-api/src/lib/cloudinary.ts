@@ -16,6 +16,8 @@ const storage = new CloudinaryStorage({
     // Determine folder based on product ID if available, or use generic products folder
     const productId = req.params.id || 'new-product';
     
+    console.log(`[Cloudinary] Initiating upload for product: ${productId}, file: ${file.originalname}`);
+
     return {
       folder: `accessomart/products/${productId}`,
       format: 'webp', // Auto-optimization to WebP

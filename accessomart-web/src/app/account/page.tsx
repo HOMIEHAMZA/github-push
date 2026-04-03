@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuthStore } from '@/store/useAuthStore';
 import { 
   Package, 
   MapPin, 
@@ -17,8 +16,6 @@ import { ordersApi, wishlistApi, addressApi } from '@/lib/api-client';
 import { ApiOrder, ApiAddress } from '@/lib/api-types';
 
 export default function AccountDashboard() {
-  // user is intentionally left unused for potential future UI personalization
-  // const { user } = useAuthStore();
   const [recentOrders, setRecentOrders] = useState<ApiOrder[]>([]);
   const [defaultAddress, setDefaultAddress] = useState<ApiAddress | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);

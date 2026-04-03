@@ -368,11 +368,23 @@ type CloudinaryFile = {
 adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req, res) => {
   try {
     const productId = req.params.id;
-    const files = (req.files as CloudinaryFile[]) || [];
+    const files = (req.files as any[]) || [];
+
+    console.log(`[Admin] Image upload request received for product: ${productId}`);
+    console.log(`[Admin] Number of files received: ${files.length}`);
 
     if (!files || files.length === 0) {
+      console.warn(`[Admin] No files were found in req.files for product: ${productId}`);
       return res.status(400).json({ error: 'No images uploaded' });
     }
+
+    // Identify if Cloudinary provided the path correctly
+    console.log(`[Admin] First file meta:`, JSON.stringify({
+      originalname: files[0].originalname,
+      mimetype: files[0].mimetype,
+      path: files[0].path,
+      secure_url: files[0].secure_url
+    }));
 
     const product = await prisma.product.findUnique({
       where: { id: productId },
@@ -380,20 +392,29 @@ adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req,
     });
 
     if (!product) {
+       console.error(`[Admin] Product not found for ID: ${productId}`);
       return res.status(404).json({ error: 'Product not found' });
     }
 
     const imageData = files.map((file, index) => ({
       productId,
-      url: file.path,
+      url: file.path || file.secure_url, // Use path or secure_url
       altText: product.name,
       isPrimary: product.images.length === 0 && index === 0,
       sortOrder: product.images.length + index,
     }));
 
-    await prisma.productImage.createMany({
-      data: imageData,
-    });
+    console.log(`[Admin] Attempting to save ${imageData.length} image records to DB`);
+
+    try {
+      await prisma.productImage.createMany({
+        data: imageData,
+      });
+      console.log(`[Admin] Successfully saved image records to DB`);
+    } catch (dbError: any) {
+      console.error(`[Admin] Database Error saving images:`, dbError);
+      throw new Error(`Database persistence failed: ${dbError.message}`);
+    }
 
     const updatedImages = await prisma.productImage.findMany({
       where: { productId },
@@ -402,8 +423,8 @@ adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req,
 
     return res.status(201).json({ images: updatedImages });
   } catch (error: any) {
-    console.error('Upload Error:', error);
-    return res.status(500).json({
+    console.error('Upload Process Failure:', error);
+    return res.status(error.status || 500).json({
       error: 'Failed to upload images',
       details: error?.message || 'Unknown server error',
     });
