@@ -71,8 +71,22 @@ async function apiFetch<T>(
   const data: unknown = isJson ? await res.json().catch(() => ({})) : null;
 
   if (!res.ok) {
-    const errorObj = data as { error?: string; message?: string } | null;
-    const errorMessage = errorObj?.error || errorObj?.message || `Request failed with status ${res.status}`;
+    const errorObj = data as { error?: unknown; details?: unknown; message?: string } | null;
+    let errorMessage: string;
+
+    if (errorObj?.details && typeof errorObj.details === 'string') {
+      errorMessage = errorObj.details;
+    } else if (errorObj?.error && typeof errorObj.error === 'string') {
+      errorMessage = errorObj.error;
+    } else if (errorObj?.message && typeof errorObj.message === 'string') {
+      errorMessage = errorObj.message;
+    } else if (errorObj?.details || errorObj?.error) {
+      // Handle complex error objects (like Zod errors)
+      errorMessage = JSON.stringify(errorObj?.details || errorObj?.error);
+    } else {
+      errorMessage = `Request failed with status ${res.status}`;
+    }
+
     throw new Error(errorMessage);
   }
   return data as T;
@@ -302,7 +316,7 @@ export const adminApi = {
   getSettings: () =>
     apiFetch<{ settings: ApiAdminSettings }>('/admin/settings'),
 
-  updateSetting: (key: string, value: any) =>
+  updateSetting: (key: string, value: unknown) =>
     apiFetch(`/admin/settings/${key}`, {
       method: 'PUT',
       body: JSON.stringify({ value }),
@@ -445,6 +459,12 @@ export const adminApi = {
   setPrimaryImage: (productId: string, imageId: string) =>
     apiFetch<{ image: ApiProductImage }>(`/admin/products/${productId}/images/${imageId}/primary`, {
       method: 'PATCH',
+    }),
+
+  reorderProductImages: (productId: string, imageIds: string[]) =>
+    apiFetch<{ images: ApiProductImage[] }>(`/admin/products/${productId}/images/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ imageIds }),
     }),
 };
 

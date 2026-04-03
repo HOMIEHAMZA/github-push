@@ -26,6 +26,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isSlugModified, setIsSlugModified] = useState(!!product?.slug);
 
   // Sync internal state if product prop changes (e.g. when opening for a different product)
   useEffect(() => {
@@ -40,6 +41,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         status: product.status || 'DRAFT',
         images: product.images || []
       });
+      setIsSlugModified(!!product.slug);
     }
   }, [product]);
 
@@ -47,11 +49,29 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     setFormData(prev => ({ ...prev, images: newImages }));
   };
 
+  const handleNameChange = (name: string) => {
+    setFormData(prev => {
+      const next = { ...prev, name };
+      if (!isSlugModified) {
+        next.slug = name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+      return next;
+    });
+  };
+
+  const handleSlugChange = (slug: string) => {
+    setFormData(prev => ({ ...prev, slug }));
+    if (!isSlugModified) setIsSlugModified(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || formData.basePrice <= 0) return;
+    if (!formData.name || (formData.basePrice === undefined || formData.basePrice <= 0)) return;
 
-    // Auto-generate slug if missing
+    // Final slug fallback
     const finalData = { ...formData };
     if (!finalData.slug) {
       finalData.slug = finalData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -60,6 +80,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     try {
       setIsSaving(true);
       await onSave(finalData);
+    } catch (err) {
+      console.error('Submit Error:', err);
+      // Error is handled by parent's toast
     } finally {
       setIsSaving(false);
     }
@@ -99,7 +122,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                   placeholder="e.g. GMMK Pro White Ice"
                   className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleNameChange(e.target.value)}
                 />
               </div>
 
@@ -142,7 +165,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                     placeholder="e.g. gmmk-pro-white"
                     className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all font-mono text-[10px]"
                     value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    onChange={(e) => handleSlugChange(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, X, Trash2, Star, Loader2 } from 'lucide-react';
+import { Reorder } from 'framer-motion';
+import { Upload, X, Trash2, Star, Loader2, GripVertical } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { adminApi } from '@/lib/api-client';
@@ -90,6 +91,19 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
     }
   };
 
+  const handleReorder = async (newOrder: ApiProductImage[]) => {
+    // Optimistic local update
+    onImagesChange(newOrder);
+
+    try {
+      const imageIds = newOrder.map(img => img.id);
+      await adminApi.reorderProductImages(productId, imageIds);
+    } catch (err: unknown) {
+      console.error('Reorder update failed:', err);
+      setError('Failed to save image order on server');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Upload Zone */}
@@ -145,17 +159,23 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
         </div>
       )}
 
-      {/* Gallery Grid */}
+      {/* Gallery Grid with Reordering */}
       {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+        <Reorder.Group 
+          axis="x" 
+          values={images} 
+          onReorder={handleReorder}
+          className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6"
+        >
           {images.map((image) => (
-            <div 
+            <Reorder.Item 
               key={image.id}
+              value={image}
               className={cn(
-                "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300",
+                "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing",
                 image.isPrimary 
                   ? "border-cyan-500 ring-2 ring-cyan-500/20" 
-                  : "border-slate-700 hover:border-slate-500"
+                  : "border-slate-700 hover:border-cyan-500/50"
               )}
             >
               <Image 
@@ -163,22 +183,27 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
                 alt={image.altText || 'Product visual asset'} 
                 fill
                 sizes="(max-width: 768px) 50vw, 20vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
+                className="object-cover transition-transform duration-500 group-hover:scale-105 select-none"
               />
               
+              {/* Drag Handle Overlay (Visible on Hover) */}
+              <div className="absolute top-2 right-2 p-1 rounded bg-black/40 backdrop-blur-md text-white/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                <GripVertical className="w-4 h-4" />
+              </div>
+
               {/* Badge for Primary */}
               {image.isPrimary && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[10px] font-bold uppercase tracking-wider">
+                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[10px] font-bold uppercase tracking-wider shadow-lg">
                   Primary
                 </div>
               )}
 
               {/* Overlay Controls */}
-              <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
                 {!image.isPrimary && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setPrimary(image.id); }}
-                    className="p-2 rounded-full bg-slate-800 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-colors"
+                    className="p-2.5 rounded-full bg-slate-800/90 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-all transform hover:scale-110"
                     title="Set as Primary"
                   >
                     <Star className="w-4 h-4" />
@@ -186,15 +211,15 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); removeImage(image.id); }}
-                  className="p-2 rounded-full bg-slate-800 text-slate-200 hover:bg-red-500 transition-colors"
+                  className="p-2.5 rounded-full bg-slate-800/90 text-slate-200 hover:bg-red-500 transition-all transform hover:scale-110"
                   title="Remove Image"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            </Reorder.Item>
           ))}
-        </div>
+        </Reorder.Group>
       )}
     </div>
   );

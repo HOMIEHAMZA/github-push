@@ -181,20 +181,20 @@ adminRoutes.post('/categories', async (req, res) => {
 const productCreateSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).optional(),
-  description: z.string().optional(),
-  shortDesc: z.string().optional(),
-  brandId: z.string().optional(),
-  categoryId: z.string().optional(),
+  description: z.string().nullable().optional(),
+  shortDesc: z.string().nullable().optional(),
+  brandId: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
   basePrice: z.number().positive(),
-  comparePrice: z.number().positive().optional(),
-  costPrice: z.number().positive().optional(),
+  comparePrice: z.number().positive().nullable().optional(),
+  costPrice: z.number().positive().nullable().optional(),
   status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVED']).default('DRAFT'),
   isFeatured: z.boolean().default(false),
   isDigital: z.boolean().default(false),
-  weight: z.number().optional(),
+  weight: z.number().nullable().optional(),
   tags: z.array(z.string()).default([]),
-  metaTitle: z.string().optional(),
-  metaDesc: z.string().optional(),
+  metaTitle: z.string().nullable().optional(),
+  metaDesc: z.string().nullable().optional(),
 });
 
 const productUpdateSchema = productCreateSchema.partial();
@@ -321,7 +321,15 @@ adminRoutes.post('/products', async (req, res) => {
 
 adminRoutes.patch('/products/:id', async (req, res) => {
   try {
-    const data = productUpdateSchema.parse(req.body);
+    const body = { ...req.body };
+    
+    // Normalize empty strings to null for optional fields
+    const optionalFields = ['brandId', 'categoryId', 'description', 'shortDesc', 'metaTitle', 'metaDesc'];
+    optionalFields.forEach(field => {
+      if (body[field] === '') body[field] = null;
+    });
+
+    const data = productUpdateSchema.parse(body);
 
     const product = await prisma.product.update({
       where: { id: req.params.id },
@@ -339,11 +347,18 @@ adminRoutes.patch('/products/:id', async (req, res) => {
     });
 
     return res.json({ product });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Product Update Error:', error);
+    
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      const details = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      return res.status(400).json({ error: 'Validation failed', details });
     }
-    return res.status(500).json({ error: 'Failed to update product' });
+    
+    return res.status(400).json({ 
+      error: 'Failed to update product', 
+      details: error?.message || 'Unknown error' 
+    });
   }
 });
 
@@ -514,6 +529,40 @@ adminRoutes.patch('/products/:productId/images/:imageId/primary', async (req, re
     return res.json({ image });
   } catch {
     return res.status(500).json({ error: 'Failed to update primary image' });
+  }
+});
+
+adminRoutes.patch('/products/:productId/images/reorder', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { imageIds } = req.body;
+
+    if (!Array.isArray(imageIds)) {
+      return res.status(400).json({ error: 'imageIds must be an array' });
+    }
+
+    // Perform reordering in a transaction
+    await prisma.$transaction(
+      imageIds.map((id, index) =>
+        prisma.productImage.update({
+          where: { id, productId },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    const updatedImages = await prisma.productImage.findMany({
+      where: { productId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return res.json({ images: updatedImages });
+  } catch (error: any) {
+    console.error('Image Reorder Error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to reorder images', 
+      details: error.message 
+    });
   }
 });
 
