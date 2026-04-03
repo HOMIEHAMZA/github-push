@@ -163,6 +163,7 @@ export default function OrderManager() {
                     </div>
 
                     <button
+                      onClick={() => addToast(`Order details for ${order.orderNumber || order.id} coming in next transmission`, 'info')}
                       className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
                       aria-label="View order details"
                     >

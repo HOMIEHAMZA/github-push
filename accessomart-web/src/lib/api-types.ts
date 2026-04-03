@@ -201,6 +201,9 @@ export interface ApiOrderItem {
   productName: string;
   variantName: string;
   imageUrl?: string;
+  variant?: ApiProductVariant & {
+    product: Pick<ApiProduct, 'id' | 'name' | 'slug'>;
+  };
 }
 
 export interface ApiPayment {

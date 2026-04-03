@@ -281,14 +281,31 @@ orderRoutes.post('/:id/capture-paypal', authenticate, async (req: AuthRequest, r
 // ─── PATCH /api/v1/orders/:id/status (Admin only) ────────────────────────────
 orderRoutes.patch('/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   const { status } = req.body;
-  const order = await prisma.order.update({
-    where: { id: req.params.id },
-    data: {
-      status,
-      ...(status === 'SHIPPED'    ? { shippedAt: new Date() }    : {}),
-      ...(status === 'DELIVERED'  ? { deliveredAt: new Date() }  : {}),
-      ...(status === 'CANCELLED'  ? { cancelledAt: new Date() }  : {}),
-    },
-  });
-  return res.json({ order });
+
+  const validStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    const updateData: any = { status };
+
+    if (status === 'SHIPPED') {
+      updateData.shippedAt = new Date();
+    } else if (status === 'DELIVERED') {
+      updateData.deliveredAt = new Date();
+    } else if (status === 'CANCELLED') {
+      updateData.cancelledAt = new Date();
+    }
+
+    const order = await prisma.order.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    return res.json({ order });
+  } catch (error) {
+    console.error('[Orders API] Status Update Error:', error);
+    return res.status(500).json({ error: 'Failed to update order status' });
+  }
 });
