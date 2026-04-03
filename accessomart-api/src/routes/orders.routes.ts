@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { authenticate, AuthRequest, requireAdmin } from '../middleware/auth.middleware';
 import { stripe } from '../lib/stripe';
 import { paypalClient } from '../lib/paypal';
 import paypal from '@paypal/checkout-server-sdk';
@@ -279,7 +279,7 @@ orderRoutes.post('/:id/capture-paypal', authenticate, async (req: AuthRequest, r
 });
 
 // ─── PATCH /api/v1/orders/:id/status (Admin only) ────────────────────────────
-orderRoutes.patch('/:id/status', authenticate, async (req: AuthRequest, res) => {
+orderRoutes.patch('/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   const { status } = req.body;
   const order = await prisma.order.update({
     where: { id: req.params.id },
