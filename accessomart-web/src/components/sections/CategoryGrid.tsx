@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface Category {
   id: string;
@@ -7,6 +8,7 @@ interface Category {
   count: string;
   imageUrl: string;
   color?: string;
+  slug?: string;
 }
 
 interface CategoryGridProps {
@@ -28,15 +30,19 @@ export function CategoryGrid({ title, subtitle, categories }: CategoryGridProps)
               {title}
             </h2>
           </div>
-          <button className="text-primary font-semibold uppercase tracking-wider text-sm hover:underline underline-offset-8">
+          <Link 
+            href="/products" 
+            className="text-primary font-semibold uppercase tracking-wider text-sm hover:underline underline-offset-8 transition-all"
+          >
             View All Collections
-          </button>
+          </Link>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {categories.map((category) => (
-            <div 
+            <Link 
               key={category.id} 
+              href={`/products?category=${category.slug || category.name.toLowerCase().replace(/ /g, '-')}`}
               className="group relative h-80 overflow-hidden rounded-xl bg-surface-container flex flex-col justify-end transition-all duration-500 hover:scale-[1.02]"
             >
               {/* Background Glow */}
@@ -56,14 +62,14 @@ export function CategoryGrid({ title, subtitle, categories }: CategoryGridProps)
               </div>
               
               {/* Content */}
-              <div className="relative z-10 p-8 pt-0 mt-auto bg-gradient-to-t from-surface-container via-surface-container/90 to-transparent">
+              <div className="relative z-10 p-8 pt-0 mt-auto bg-linear-to-t from-surface-container via-surface-container/90 to-transparent">
                 <h4 className="text-2xl font-display text-on-surface mb-1">{category.name}</h4>
                 <p className="text-on-surface-variant font-sans text-sm uppercase tracking-widest">{category.count} Products</p>
               </div>
               
               {/* Overlay Link Effect */}
               <div className="absolute inset-0 border border-white/5 rounded-xl group-hover:border-primary/30 transition-colors duration-500" />
-            </div>
+            </Link>
           ))}
         </div>
       </div>

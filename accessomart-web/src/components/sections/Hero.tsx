@@ -7,12 +7,24 @@ interface HeroProps {
   subtitle: string;
   description: string;
   ctaText: string;
+  ctaHref?: string;
   secondaryCtaText: string;
+  secondaryCtaHref?: string;
   imageUrl: string;
   badge?: string;
 }
 
-export function Hero({ title, subtitle, description, ctaText, secondaryCtaText, imageUrl, badge }: HeroProps) {
+export function Hero({ 
+  title, 
+  subtitle, 
+  description, 
+  ctaText, 
+  ctaHref = '/products',
+  secondaryCtaText, 
+  secondaryCtaHref = '/products',
+  imageUrl, 
+  badge 
+}: HeroProps) {
   return (
     <section className="relative min-h-[90vh] flex items-center pt-24 overflow-hidden">
       {/* Background Glow */}
@@ -40,14 +52,14 @@ export function Hero({ title, subtitle, description, ctaText, secondaryCtaText, 
           </p>
           
           <div className="flex flex-wrap gap-6">
-            <PrimaryButton>{ctaText}</PrimaryButton>
-            <SecondaryButton>{secondaryCtaText}</SecondaryButton>
+            <PrimaryButton href={ctaHref}>{ctaText}</PrimaryButton>
+            <SecondaryButton href={secondaryCtaHref}>{secondaryCtaText}</SecondaryButton>
           </div>
         </div>
         
         <div className="relative h-[500px] lg:h-[700px] flex items-center justify-center">
           {/* Animated Glow behind image */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent blur-3xl opacity-50 animate-pulse" />
+          <div className="absolute inset-0 bg-linear-to-tr from-primary/20 to-transparent blur-3xl opacity-50 animate-pulse" />
           
           <div className="relative w-full h-full lg:scale-110 transform lg:translate-x-12 filter drop-shadow-[0_0_50px_rgba(143,245,255,0.2)]">
             <Image

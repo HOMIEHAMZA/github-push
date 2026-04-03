@@ -1,5 +1,8 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useMemo } from 'react';
 import { ProductCard } from '@/components/ui/ProductCard';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -19,7 +22,19 @@ interface FeaturedProductsProps {
   products: Product[];
 }
 
+type Tab = 'all' | 'new' | 'best';
+
 export function FeaturedProducts({ title, subtitle, products }: FeaturedProductsProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('all');
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (activeTab === 'all') return products.slice(0, 8);
+    if (activeTab === 'new') return products.slice().reverse().slice(0, 4); // Mocking "new" as recent
+    if (activeTab === 'best') return products.filter(p => p.isFeatured).slice(0, 4);
+    return products;
+  }, [products, activeTab]);
+
   if (!products || products.length === 0) return null;
 
   return (
@@ -35,14 +50,35 @@ export function FeaturedProducts({ title, subtitle, products }: FeaturedProducts
             </h2>
           </div>
           <div className="flex items-center gap-8">
-            <button className="text-on-surface font-semibold text-sm hover:text-primary transition-colors pb-2 border-b-2 border-primary">All Products</button>
-            <button className="text-on-surface-variant font-semibold text-sm hover:text-on-surface transition-colors pb-2 border-b-2 border-transparent">New Arrivals</button>
-            <button className="text-on-surface-variant font-semibold text-sm hover:text-on-surface transition-colors pb-2 border-b-2 border-transparent">Best Sellers</button>
+            <button 
+              onClick={() => setActiveTab('all')}
+              className={`font-semibold text-sm transition-all pb-2 border-b-2 ${
+                activeTab === 'all' ? 'text-primary border-primary' : 'text-on-surface-variant border-transparent hover:text-on-surface'
+              }`}
+            >
+              All Products
+            </button>
+            <button 
+              onClick={() => setActiveTab('new')}
+              className={`font-semibold text-sm transition-all pb-2 border-b-2 ${
+                activeTab === 'new' ? 'text-primary border-primary' : 'text-on-surface-variant border-transparent hover:text-on-surface'
+              }`}
+            >
+              New Arrivals
+            </button>
+            <button 
+              onClick={() => setActiveTab('best')}
+              className={`font-semibold text-sm transition-all pb-2 border-b-2 ${
+                activeTab === 'best' ? 'text-primary border-primary' : 'text-on-surface-variant border-transparent hover:text-on-surface'
+              }`}
+            >
+              Best Sellers
+            </button>
           </div>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <ProductCard 
               key={product.id}
               {...product}
@@ -51,9 +87,12 @@ export function FeaturedProducts({ title, subtitle, products }: FeaturedProducts
         </div>
         
         <div className="mt-20 flex justify-center">
-          <button className="px-12 py-4 rounded-xl border border-outline-variant/30 text-on-surface font-display uppercase tracking-widest text-sm hover:bg-surface-container transition-all hover:border-primary/50">
+          <Link 
+            href="/products"
+            className="px-12 py-4 rounded-xl border border-outline-variant/30 text-on-surface font-display uppercase tracking-widest text-sm hover:bg-surface-container transition-all hover:border-primary/50"
+          >
             Show More Gear
-          </button>
+          </Link>
         </div>
       </div>
     </section>
