@@ -9,6 +9,7 @@ import { ProductPurchaseBlock } from '@/components/sections/ProductPurchaseBlock
 import { SpecSheetGlass } from '@/components/ui/SpecSheetGlass';
 import { ReviewsSection } from '@/components/sections/ReviewsSection';
 import { Loader2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -60,12 +61,12 @@ export default function ProductDetailPage() {
             <AlertCircle className="text-error mb-4" size={48} />
             <p className="text-on-surface font-sans mb-2">System Failure: Module offline.</p>
             <p className="text-on-surface-variant font-sans text-sm mb-6">{error || 'Product not found in database.'}</p>
-            <button 
-              onClick={() => window.location.href = '/products'}
-              className="px-6 py-2 bg-surface-container-highest text-on-surface rounded font-display text-xs tracking-widest uppercase hover:brightness-110 transition-all"
+            <Link 
+              href="/products"
+              className="px-6 py-2 bg-surface-container-highest text-on-surface rounded font-display text-xs tracking-widest uppercase hover:brightness-110 transition-all inline-block"
             >
               Return to Catalog
-            </button>
+            </Link>
           </div>
         </main>
       </div>

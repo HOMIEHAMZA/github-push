@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Plus, ShoppingBag } from 'lucide-react';
+import { Heart, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useToastStore } from '@/store/useToastStore';
@@ -16,18 +16,32 @@ interface ProductCardProps {
   brand: string;
   category: string;
   price: string | number;
-  imageUrl: string;
+  originalPrice?: string | number;
   rating?: number;
   isFeatured?: boolean;
+  imageUrl: string;
 }
 
-export function ProductCard({ id, variantId, slug, name, brand, category, price, imageUrl, rating, isFeatured = false }: ProductCardProps) {
-  const { addItem, openDrawer } = useCartStore();
+export function ProductCard({ 
+  id, 
+  variantId, 
+  slug, 
+  name, 
+  brand, 
+  category, 
+  price, 
+  originalPrice, 
+  rating, 
+  isFeatured = false,
+  imageUrl 
+}: ProductCardProps) {
+  const { addItem } = useCartStore();
   const { toggleWishlist, isInWishlist: checkWishlist } = useWishlistStore();
   const { addToast } = useToastStore();
 
   const isWishlisted = checkWishlist(id);
-  const displayPrice = typeof price === 'number' ? `$${price.toFixed(2)}` : price;
+  const displayPrice = typeof price === 'number' ? `$${price.toLocaleString()}` : price;
+  const displayOriginalPrice = typeof originalPrice === 'number' ? `$${originalPrice.toLocaleString()}` : originalPrice;
 
   return (
     <div className={`
@@ -45,6 +59,8 @@ export function ProductCard({ id, variantId, slug, name, brand, category, price,
             toggleWishlist(id);
             addToast(isWishlisted ? 'Removed from Wishlist' : 'Added to Wishlist', 'info');
           }}
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           className={`
             p-2 rounded-lg backdrop-blur-md border transition-all
             ${isWishlisted 
@@ -61,10 +77,13 @@ export function ProductCard({ id, variantId, slug, name, brand, category, price,
             try {
               await addItem(variantId || id);
               addToast(`Added ${name} to loadout`);
-            } catch (err: any) {
-              addToast(err?.message || 'Failed to add to cart', 'error');
+            } catch (err) {
+              const errorMessage = err instanceof Error ? err.message : 'Failed to add to cart';
+              addToast(errorMessage, 'error');
             }
           }}
+          aria-label="Add to cart"
+          title="Add to cart"
           className="p-2 rounded-lg bg-primary/20 backdrop-blur-md border border-primary/40 text-primary hover:bg-primary/30 hover:shadow-[0_0_15px_rgba(143,245,255,0.3)] transition-all"
         >
           <Plus size={18} />
@@ -73,7 +92,7 @@ export function ProductCard({ id, variantId, slug, name, brand, category, price,
 
       <Link href={`/products/${slug || id}`} className="block">
         {/* Aspect ratio container for the image */}
-        <div className="relative w-full aspect-[4/5] bg-surface-container-lowest">
+        <div className="relative w-full aspect-4/5 bg-surface-container-lowest">
           {imageUrl && (
             <Image
               src={imageUrl}
@@ -85,7 +104,7 @@ export function ProductCard({ id, variantId, slug, name, brand, category, price,
           )}
           
           {/* Gradient Mask overlaid on the image to fade into the card color at the bottom */}
-          <div className="absolute inset-0 bg-gradient-to-t from-surface-container-low via-surface-container-low/40 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-surface-container-low via-surface-container-low/40 to-transparent" />
           
           {/* Content overlapping the image at the bottom */}
           <div className="absolute bottom-0 left-0 w-full p-6 text-left">
@@ -100,7 +119,12 @@ export function ProductCard({ id, variantId, slug, name, brand, category, price,
             </div>
             <p className="text-on-surface-variant uppercase text-[10px] font-semibold tracking-wider mb-1 opacity-60">{category}</p>
             <h3 className="text-on-surface font-display text-lg mb-1 truncate leading-tight">{name}</h3>
-            <p className="text-on-surface font-bold text-base">{displayPrice}</p>
+            <div className="flex items-center gap-3">
+              <p className="text-on-surface font-bold text-base">{displayPrice}</p>
+              {displayOriginalPrice && (
+                <p className="text-on-surface-variant line-through text-xs opacity-50">{displayOriginalPrice}</p>
+              )}
+            </div>
           </div>
         </div>
       </Link>

@@ -78,10 +78,10 @@ export function FlashDeals({ title, subtitle, deals, timeLeft }: FlashDealsProps
                 brand={deal.brand}
                 category={deal.category}
                 price={deal.price}
+                originalPrice={deal.originalPrice}
                 imageUrl={deal.imageUrl}
               />
               <div className="mt-4 px-2">
-                <span className="text-on-surface-variant line-through text-xs mr-2">{deal.originalPrice}</span>
                 <span className="text-primary font-bold text-sm tracking-wide">LIMITED STOCK</span>
               </div>
             </div>
