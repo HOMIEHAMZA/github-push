@@ -22,6 +22,8 @@ model User {
   updatedAt             DateTime       @updatedAt @map("updated_at")
   passwordResetToken   String?        @unique @map("password_reset_token")
   passwordResetExpires DateTime?      @map("password_reset_expires")
+  emailVerificationToken   String?        @unique @map("email_verification_token")
+  emailVerificationExpires DateTime?      @map("email_verification_expires")
   addresses             Address[]
   cart          Cart?
   orders        Order[]

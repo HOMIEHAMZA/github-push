@@ -5,6 +5,7 @@ import { Footer } from "@/components/ui/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { Toast } from "@/components/ui/Toast";
 import { GuestAuthProvider } from "@/components/providers/GuestAuthProvider";
+import { VerificationBanner } from "@/components/auth/VerificationBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,6 +35,7 @@ export default function RootLayout({
     >
       <body className="bg-surface text-on-surface font-sans min-h-screen flex flex-col">
         <GuestAuthProvider>
+          <VerificationBanner />
           <GlassNavbar />
           <main className="flex-1 mt-32">
             {children}

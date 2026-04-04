@@ -32,6 +32,14 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+
+const resendVerificationSchema = z.object({
+  email: z.string().email(),
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateTokens(userId: string, role: string) {
   const accessSecret = process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me';
@@ -61,10 +69,30 @@ authRoutes.post('/register', loginLimiter, validate(registerSchema), async (req,
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const user = await prisma.user.create({
-      data: { firstName, lastName, email, passwordHash },
+      data: { 
+        firstName, 
+        lastName, 
+        email, 
+        passwordHash,
+        emailVerificationToken: hashedVerificationToken,
+        emailVerificationExpires: verificationExpires
+      },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
+
+    // In production, send an email. For now, log it clearly for development.
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    console.log('------------------------------------------------------------');
+    console.log(`[Auth:Register] Email Verification Link for ${email}:`);
+    console.log(verificationUrl);
+    console.log('------------------------------------------------------------');
 
     const { accessToken, refreshToken } = generateTokens(user.id, user.role);
     await prisma.refreshToken.create({
@@ -249,5 +277,71 @@ authRoutes.post('/reset-password', loginLimiter, validate(resetPasswordSchema), 
   } catch (err) {
     console.error('[Auth:ResetPassword] Error:', err);
     return res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
+
+// ─── POST /api/v1/auth/verify-email ───────────────────────────────────────────
+authRoutes.post('/verify-email', validate(verifyEmailSchema), async (req, res) => {
+  try {
+    const { token } = req.body;
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification token.' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    return res.json({ message: 'Email verified successfully! You now have full access to Accessomart.' });
+  } catch (err) {
+    console.error('[Auth:VerifyEmail] Error:', err);
+    return res.status(500).json({ error: 'Failed to verify email.' });
+  }
+});
+
+// ─── POST /api/v1/auth/resend-verification ────────────────────────────────────
+authRoutes.post('/resend-verification', loginLimiter, validate(resendVerificationSchema), async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (user && !user.emailVerified) {
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerificationToken: hashedToken,
+          emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        },
+      });
+
+      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+      console.log('------------------------------------------------------------');
+      console.log(`[Auth:ResendVerification] New Link for ${email}:`);
+      console.log(verificationUrl);
+      console.log('------------------------------------------------------------');
+    }
+
+    // Always return success to avoid leaking user existence
+    return res.json({ message: 'If the account is unverified, a new link has been generated.' });
+  } catch (err) {
+    console.error('[Auth:ResendVerification] Error:', err);
+    return res.status(500).json({ error: 'Failed to resend verification link.' });
   }
 });
