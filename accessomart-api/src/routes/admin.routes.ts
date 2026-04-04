@@ -111,6 +111,7 @@ adminRoutes.patch('/homepage/:id', validate(homepageSectionSchema), async (req: 
     });
     return res.json({ section });
   } catch (err: any) {
+    console.error(`[Admin API] Homepage Section update error (${req.params.id}):`, err);
     return res.status(500).json({ error: 'Failed to update section', details: err.message });
   }
 });
@@ -131,6 +132,7 @@ adminRoutes.put('/settings/:key', validate(adminSettingSchema), async (req: any,
     });
     return res.json({ setting });
   } catch (err: any) {
+    console.error(`[Admin API] Setting upsert error (${req.params.key}):`, err);
     return res.status(500).json({ error: 'Failed to update setting', details: err.message });
   }
 });
@@ -209,6 +211,7 @@ adminRoutes.post('/brands', validate(brandSchema), async (req: any, res) => {
     });
     return res.status(201).json({ brand });
   } catch (err: any) {
+    console.error('[Admin API] Brand creation error:', err);
     return res.status(500).json({ error: 'Failed to create brand', details: err.message });
   }
 });
@@ -229,6 +232,7 @@ adminRoutes.post('/categories', validate(categorySchema), async (req: any, res) 
     });
     return res.status(201).json({ category });
   } catch (err: any) {
+    console.error('[Admin API] Category creation error:', err);
     return res.status(500).json({ error: 'Failed to create category', details: err.message });
   }
 });

@@ -77,12 +77,21 @@ app.use((_req, res) => {
 });
 
 // ─── Global Error Handler ──────────────────────────────────────────────────────
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  
+  // Log the error with request context
+  console.error(`[Global Error] ${req.method} ${req.originalUrl}:`, {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    userId: (req as any).userId,
+  });
+
+  res.status(status).json({
     error: process.env.NODE_ENV === 'production'
       ? 'Internal server error.'
       : err.message,
+    details: process.env.NODE_ENV === 'production' ? undefined : err.details || err,
   });
 });
 

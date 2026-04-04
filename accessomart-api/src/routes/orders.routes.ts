@@ -227,67 +227,72 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
   }
 
   // Create order in transaction
-  const order = await prisma.$transaction(async (tx) => {
-    let finalAddressId = addressId;
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      let finalAddressId = addressId;
 
-    if (!finalAddressId && addressData) {
-      const newAddress = await tx.address.create({
+      if (!finalAddressId && addressData) {
+        const newAddress = await tx.address.create({
+          data: {
+            userId: req.userId!,
+            firstName: addressData.firstName,
+            lastName: addressData.lastName,
+            line1: addressData.address,
+            city: addressData.city,
+            state: addressData.state || 'N/A',
+            postalCode: addressData.postalCode,
+            country: addressData.country || 'US',
+          }
+        });
+        finalAddressId = newAddress.id;
+      }
+
+      const newOrder = await tx.order.create({
         data: {
+          orderNumber,
           userId: req.userId!,
-          firstName: addressData.firstName,
-          lastName: addressData.lastName,
-          line1: addressData.address,
-          city: addressData.city,
-          state: addressData.state || 'N/A',
-          postalCode: addressData.postalCode,
-          country: addressData.country || 'US',
-        }
-      });
-      finalAddressId = newAddress.id;
-    }
-
-    const newOrder = await tx.order.create({
-      data: {
-        orderNumber,
-        userId: req.userId!,
-        addressId: finalAddressId,
-        subtotal,
-        shippingCost,
-        taxAmount,
-        total,
-        couponCode,
-        notes,
-        items: {
-          create: cart.items.map(item => ({
-            variantId: item.variantId,
-            quantity: item.quantity,
-            unitPrice: Number(item.variant.price),
-            totalPrice: Number(item.variant.price) * item.quantity,
-            productName: item.variant.product.name,
-            variantName: item.variant.name,
-            imageUrl: item.variant.product.images[0]?.url,
-          })),
+          addressId: finalAddressId,
+          subtotal,
+          shippingCost,
+          taxAmount,
+          total,
+          couponCode,
+          notes,
+          items: {
+            create: cart.items.map(item => ({
+              variantId: item.variantId,
+              quantity: item.quantity,
+              unitPrice: Number(item.variant.price),
+              totalPrice: Number(item.variant.price) * item.quantity,
+              productName: item.variant.product.name,
+              variantName: item.variant.name,
+              imageUrl: item.variant.product.images[0]?.url,
+            })),
+          },
         },
-      },
-      include: { items: true },
+        include: { items: true },
+      });
+
+      // Create payment stub (PENDING)
+      await tx.payment.create({
+        data: {
+          orderId: newOrder.id,
+          provider: paymentProvider as any,
+          providerPaymentId,
+          amount: total,
+          status: 'PENDING',
+        },
+      });
+
+      // We DO NOT clear the cart items yet. Cart items are only cleared upon successful payment.
+      return newOrder;
     });
 
-    // Create payment stub (PENDING)
-    await tx.payment.create({
-      data: {
-        orderId: newOrder.id,
-        provider: paymentProvider as any,
-        providerPaymentId,
-        amount: total,
-        status: 'PENDING',
-      },
-    });
-
-    // We DO NOT clear the cart items yet. Cart items are only cleared upon successful payment.
-    return newOrder;
-  });
-
-  return res.status(201).json({ order, clientSecret });
+    return res.status(201).json({ order, clientSecret });
+  } catch (err: any) {
+    console.error('[Orders API] Checkout Transaction Error:', err);
+    return res.status(500).json({ error: 'Failed to process checkout. Please try again.', details: err.message });
+  }
 });
 
 // ─── POST /api/v1/orders/:id/confirm-payment ─────────────────────────────────
@@ -330,6 +335,7 @@ orderRoutes.post('/:id/confirm-payment', authenticate, async (req: AuthRequest, 
 
     res.json({ success: true, order });
   } catch (err: any) {
+    console.error(`[Orders API] Verification failed for Order ${orderId}:`, err);
     res.status(500).json({ error: `Verification failed: ${err.message}` });
   }
 });
@@ -372,6 +378,7 @@ orderRoutes.post('/:id/capture-paypal', authenticate, validate(capturePaypalSche
 
     res.json({ success: true, order });
   } catch (err: any) {
+    console.error(`[Orders API] PayPal capture failed for Order ${orderId}:`, err);
     res.status(500).json({ error: `PayPal capture failed: ${err.message}` });
   }
 });
