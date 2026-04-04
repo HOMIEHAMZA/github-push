@@ -29,11 +29,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   // Keep a snapshot of the pre-drag order so we can revert on error
   const previousOrder = useRef<ApiProductImage[]>(images);
 
-  // Keep snapshot in sync with prop changes from parent (e.g. after full refresh)
-  React.useEffect(() => {
-    previousOrder.current = images;
-  }, [images]);
-
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
@@ -49,8 +44,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
       const fileArray = Array.from(files);
       const res = await adminApi.uploadImages(productId, fileArray);
       onImagesChange(res.images);
-      // Synchronize snapshot after new assets are deployed
-      previousOrder.current = res.images;
     } catch (err: unknown) {
       console.error('Upload error details:', err);
       const e = err as { details?: Array<{ message: string }>; error?: string; message?: string };
@@ -84,10 +77,7 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   const removeImage = async (imageId: string) => {
     try {
       await adminApi.deleteImage(productId, imageId);
-      const updated = images.filter(img => img.id !== imageId);
-      onImagesChange(updated);
-      // Synchronize snapshot after asset removal
-      previousOrder.current = updated;
+      onImagesChange(images.filter(img => img.id !== imageId));
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete image';
       setError(errorMessage);

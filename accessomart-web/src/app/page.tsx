@@ -110,7 +110,7 @@ export default function Homepage() {
     <div className="min-h-screen bg-surface flex flex-col">
       <main className="grow">
         {homepageLayout.map((section) => {
-          if (!section.isEnabled) return null;
+          if (!section.enabled) return null;
 
           switch (section.id) {
             case 'hero':

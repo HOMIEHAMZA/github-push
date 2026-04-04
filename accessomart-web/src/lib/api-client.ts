@@ -71,29 +71,18 @@ async function apiFetch<T>(
   const data: unknown = isJson ? await res.json().catch(() => ({})) : null;
 
   if (!res.ok) {
-    const errorObj = data as { error?: string; message?: string; details?: unknown } | null;
+    const errorObj = data as { error?: unknown; details?: unknown; message?: string } | null;
     let errorMessage: string;
 
-    if (errorObj?.message && typeof errorObj.message === 'string') {
-      errorMessage = errorObj.message;
-      
-      // If there are validation details, append them specifically
-      if (Array.isArray(errorObj.details)) {
-        // Handle Zod-style error arrays: [{ path: ['name'], message: 'Required' }]
-        const detailsStr = (errorObj.details as Array<{ path?: string[]; message: string }>)
-          .map((d) => {
-            const path = Array.isArray(d.path) ? d.path.join('.') : '';
-            return path ? `${path}: ${d.message}` : d.message;
-          })
-          .join(', ');
-        if (detailsStr) errorMessage += ` (${detailsStr})`;
-      } else if (errorObj.details && typeof errorObj.details === 'string') {
-        errorMessage += `: ${errorObj.details}`;
-      }
+    if (errorObj?.details && typeof errorObj.details === 'string') {
+      errorMessage = errorObj.details;
     } else if (errorObj?.error && typeof errorObj.error === 'string') {
       errorMessage = errorObj.error;
-    } else if (errorObj?.details && typeof errorObj.details === 'string') {
-      errorMessage = errorObj.details;
+    } else if (errorObj?.message && typeof errorObj.message === 'string') {
+      errorMessage = errorObj.message;
+    } else if (errorObj?.details || errorObj?.error) {
+      // Handle complex error objects (like Zod errors)
+      errorMessage = JSON.stringify(errorObj?.details || errorObj?.error);
     } else {
       errorMessage = `Request failed with status ${res.status}`;
     }

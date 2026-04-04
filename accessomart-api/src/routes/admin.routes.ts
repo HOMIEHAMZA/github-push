@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 import { upload, cloudinary } from '../lib/cloudinary';
-import { uploadMiddleware } from '../middleware/upload.middleware';
 import { validate } from '../middleware/validate.middleware';
 
 export const adminRoutes = Router();
@@ -113,11 +112,7 @@ adminRoutes.patch('/homepage/:id', validate(homepageSectionSchema), async (req: 
     return res.json({ section });
   } catch (err: any) {
     console.error(`[Admin API] Homepage Section update error (${req.params.id}):`, err);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update section',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to update section', details: err.message });
   }
 });
 
@@ -138,11 +133,7 @@ adminRoutes.put('/settings/:key', validate(adminSettingSchema), async (req: any,
     return res.json({ setting });
   } catch (err: any) {
     console.error(`[Admin API] Setting upsert error (${req.params.key}):`, err);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update setting',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to update setting', details: err.message });
   }
 });
 
@@ -208,12 +199,8 @@ adminRoutes.get('/brands', async (_req, res) => {
       orderBy: { name: 'asc' },
     });
     return res.json({ brands });
-  } catch (err: any) {
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to fetch brands',
-      details: err.message
-    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch brands' });
   }
 });
 
@@ -225,11 +212,7 @@ adminRoutes.post('/brands', validate(brandSchema), async (req: any, res) => {
     return res.status(201).json({ brand });
   } catch (err: any) {
     console.error('[Admin API] Brand creation error:', err);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to create brand',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to create brand', details: err.message });
   }
 });
 
@@ -250,11 +233,7 @@ adminRoutes.post('/categories', validate(categorySchema), async (req: any, res) 
     return res.status(201).json({ category });
   } catch (err: any) {
     console.error('[Admin API] Category creation error:', err);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to create category',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to create category', details: err.message });
   }
 });
 
@@ -343,10 +322,7 @@ adminRoutes.get('/products/:id', async (req, res) => {
   });
 
   if (!product) {
-    return res.status(404).json({
-      error: 'NOT_FOUND',
-      message: 'Product not found'
-    });
+    return res.status(404).json({ error: 'Product not found' });
   }
 
   return res.json({ product });
@@ -439,25 +415,15 @@ adminRoutes.post('/products', async (req, res) => {
     console.error('Product Creation Error:', error);
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'Product validation failed',
-        details: error.errors
-      });
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
     }
 
     // Duplicate slug produces a unique constraint error — give a readable message
     if (error?.code === 'P2002' && error?.meta?.target?.includes('slug')) {
-      return res.status(400).json({
-        error: 'DUPLICATE_SLUG',
-        message: 'A product with this slug already exists. Change the name or set a custom slug.'
-      });
+      return res.status(400).json({ error: 'A product with this slug already exists. Change the name or set a custom slug.' });
     }
 
-    return res.status(400).json({
-      error: 'BAD_REQUEST',
-      message: error?.message || 'Failed to create product'
-    });
+    return res.status(400).json({ error: error?.message || 'Failed to create product' });
   }
 });
 
@@ -504,16 +470,12 @@ adminRoutes.patch('/products/:id', async (req, res) => {
     console.error('[Admin PATCH /products/:id] Error:', JSON.stringify(error?.errors || error?.message || error));
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'Update validation failed',
-        details: error.errors
-      });
+      const details = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+      return res.status(400).json({ error: 'Validation failed', details });
     }
     
     return res.status(400).json({ 
-      error: 'BAD_REQUEST', 
-      message: 'Failed to update product', 
+      error: 'Failed to update product', 
       details: error?.message || 'Unknown error' 
     });
   }
@@ -537,16 +499,13 @@ type CloudinaryFile = {
   path: string;
 };
 
-adminRoutes.post('/products/:id/images', uploadMiddleware, async (req, res) => {
+adminRoutes.post('/products/:id/images', upload.array('images', 10), async (req, res) => {
   try {
     const productId = req.params.id;
     const files = (req.files as any[]) || [];
 
     if (!files || files.length === 0) {
-      return res.status(400).json({
-        error: 'BAD_REQUEST',
-        message: 'No images uploaded'
-      });
+      return res.status(400).json({ error: 'No images uploaded' });
     }
 
     const product = await prisma.product.findUnique({
@@ -555,10 +514,7 @@ adminRoutes.post('/products/:id/images', uploadMiddleware, async (req, res) => {
     });
 
     if (!product) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Product not found'
-      });
+      return res.status(404).json({ error: 'Product not found' });
     }
 
     const imageData = files.map((file, index) => ({
@@ -586,8 +542,7 @@ adminRoutes.post('/products/:id/images', uploadMiddleware, async (req, res) => {
   } catch (error: any) {
     console.error('Upload Process Failure:', error);
     return res.status(error.status || 500).json({
-      error: 'IMAGE_UPLOAD_ERROR',
-      message: 'Failed to upload images',
+      error: 'Failed to upload images',
       details: error?.message || 'Unknown server error',
     });
   }
@@ -611,11 +566,7 @@ adminRoutes.post('/products/:id/images/:imageId/primary', async (req, res) => {
     return res.json({ message: 'Primary image updated', result });
   } catch (error: any) {
     console.error('Set Primary Error:', error);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to set primary image',
-      details: error.message
-    });
+    return res.status(500).json({ error: 'Failed to set primary image', details: error.message });
   }
 });
 
@@ -628,10 +579,7 @@ adminRoutes.delete('/products/:productId/images/:imageId', async (req, res) => {
     });
 
     if (!image) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Image not found'
-      });
+      return res.status(404).json({ error: 'Image not found' });
     }
 
     const urlParts = image.url.split('/');
@@ -660,13 +608,9 @@ adminRoutes.delete('/products/:productId/images/:imageId', async (req, res) => {
     }
 
     return res.json({ message: 'Image deleted successfully' });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Delete Error:', error);
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to delete image',
-      details: error.message
-    });
+    return res.status(500).json({ error: 'Failed to delete image' });
   }
 });
 
@@ -685,12 +629,8 @@ adminRoutes.patch('/products/:productId/images/:imageId/primary', async (req, re
     });
 
     return res.json({ image });
-  } catch (err: any) {
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update primary image',
-      details: err.message
-    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to update primary image' });
   }
 });
 
@@ -732,8 +672,7 @@ adminRoutes.patch('/products/:productId/images/reorder', async (req, res) => {
   } catch (error: any) {
     console.error('[Admin] Image Reorder Error:', error);
     return res.status(500).json({ 
-      error: 'INTERNAL_SERVER_ERROR', 
-      message: 'Failed to reorder images', 
+      error: 'Failed to reorder images', 
       details: error.message 
     });
   }
@@ -790,19 +729,11 @@ adminRoutes.post('/variants', validate(variantCreateSchema), async (req: any, re
     });
 
     return res.status(201).json({ variant: variantWithInventory });
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'Variant validation failed',
-        details: error.errors
-      });
+      return res.status(400).json({ error: error.errors });
     }
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to create variant',
-      details: error.message
-    });
+    return res.status(500).json({ error: 'Failed to create variant' });
   }
 });
 
@@ -831,12 +762,8 @@ adminRoutes.patch('/variants/:id', validate(variantUpdateSchema), async (req: an
     });
 
     return res.json({ variant: variantWithInventory });
-  } catch (err: any) {
-    return res.status(404).json({
-      error: 'NOT_FOUND',
-      message: 'Variant not found',
-      details: err.message
-    });
+  } catch {
+    return res.status(404).json({ error: 'Variant not found' });
   }
 });
 
@@ -849,10 +776,7 @@ adminRoutes.patch('/inventory/:variantId', validate(inventoryUpdateSchema), asyn
     });
 
     if (!inventory) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Inventory not found'
-      });
+      return res.status(404).json({ error: 'Inventory not found' });
     }
 
     let newQuantity = inventory.quantity;
@@ -872,12 +796,8 @@ adminRoutes.patch('/inventory/:variantId', validate(inventoryUpdateSchema), asyn
     });
 
     return res.json({ inventory: updated });
-  } catch (err: any) {
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update inventory',
-      details: err.message
-    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to update inventory' });
   }
 });
 

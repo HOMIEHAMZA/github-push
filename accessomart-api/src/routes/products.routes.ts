@@ -149,12 +149,7 @@ productRoutes.get('/:slug', async (req, res) => {
     },
   });
 
-  if (!product) {
-    return res.status(404).json({
-      error: 'NOT_FOUND',
-      message: 'Product not found.'
-    });
-  }
+  if (!product) return res.status(404).json({ error: 'Product not found.' });
   return res.json({ product });
 });
 
@@ -166,11 +161,7 @@ productRoutes.post('/', authenticate, requireAdmin, validate(productCreateSchema
     });
     return res.status(201).json({ product });
   } catch (err: any) {
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to create product',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to create product', details: err.message });
   }
 });
 
@@ -183,11 +174,7 @@ productRoutes.patch('/:id', authenticate, requireAdmin, validate(productUpdateSc
     });
     return res.json({ product });
   } catch (err: any) {
-    return res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update product',
-      details: err.message
-    });
+    return res.status(500).json({ error: 'Failed to update product', details: err.message });
   }
 });
 

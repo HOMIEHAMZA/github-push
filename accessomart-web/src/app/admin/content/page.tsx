@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { useAdminStore } from '@/store/useAdminStore';
+import { useAdminStore, HomepageSection } from '@/store/useAdminStore';
 import { 
   GripVertical, 
   Eye, 
@@ -49,7 +49,7 @@ export default function ContentManager() {
                 key={section.id}
                 className={cn(
                   "flex items-center justify-between p-5 rounded-2xl bg-white/5 border transition-all duration-300",
-                  section.isEnabled ? "border-white/10" : "border-red-500/20 opacity-50 grayscale"
+                  section.enabled ? "border-white/10" : "border-red-500/20 opacity-50 grayscale"
                 )}
               >
                 <div className="flex items-center space-x-4">
@@ -58,7 +58,6 @@ export default function ContentManager() {
                       onClick={() => handleMove(index, 'up')}
                       disabled={index === 0}
                       className="text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
-                      title="Move section up"
                     >
                       <GripVertical size={14} className="rotate-0" />
                     </button>
@@ -66,7 +65,6 @@ export default function ContentManager() {
                       onClick={() => handleMove(index, 'down')}
                       disabled={index === homepageLayout.length - 1}
                       className="text-zinc-600 hover:text-white disabled:opacity-0 transition-colors"
-                      title="Move section down"
                     >
                       <GripVertical size={14} className="rotate-0" />
                     </button>
@@ -82,12 +80,12 @@ export default function ContentManager() {
                     onClick={() => toggleSection(section.id)}
                     className={cn(
                       "flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border",
-                      section.isEnabled 
+                      section.enabled 
                         ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" 
                         : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-white"
                     )}
                   >
-                    {section.isEnabled ? (
+                    {section.enabled ? (
                       <>
                         <Eye size={14} />
                         <span>VISIBLE</span>
@@ -133,7 +131,6 @@ export default function ContentManager() {
                   "relative w-14 h-7 rounded-full transition-colors duration-300",
                   pcBuilderSettings.enabled ? "bg-tertiary" : "bg-zinc-800"
                 )}
-                title={pcBuilderSettings.enabled ? "Disable PC Builder" : "Enable PC Builder"}
               >
                 <div className={cn(
                   "absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform duration-300",
@@ -153,7 +150,7 @@ export default function ContentManager() {
                 <div>
                   <h3 className="text-base font-bold text-white mb-1 uppercase tracking-tight">Nav Integration</h3>
                   <p className="text-xs text-zinc-500 leading-relaxed max-w-[280px]">
-                    Control the visibility of the &quot;Builder&quot; terminal in the global navigation bar.
+                    Control the visibility of the "Builder" terminal in the global navigation bar.
                   </p>
                 </div>
               </div>
@@ -164,7 +161,6 @@ export default function ContentManager() {
                   "relative w-14 h-7 rounded-full transition-colors duration-300",
                   pcBuilderSettings.showInNav ? "bg-primary" : "bg-zinc-800"
                 )}
-                title={pcBuilderSettings.showInNav ? "Hide from Navigation" : "Show in Navigation"}
               >
                 <div className={cn(
                   "absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform duration-300",
