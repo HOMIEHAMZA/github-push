@@ -30,8 +30,16 @@ app.use(cors({
 }));
 
 // ─── Body Parsing ──────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    // Attach raw body to req object for webhook verification
+    if (req.originalUrl.includes('/webhook')) {
+      req.rawBody = buf;
+    }
+  },
+}));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Logging ───────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

@@ -38,6 +38,88 @@ const orderStatusSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
 });
 
+// ─── WEBHOOKS ─────────────────────────────────────────────────────────────────
+
+// Stripe Webhook: This MUST use raw body for signature verification
+orderRoutes.post('/webhook/stripe', async (req: any, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!sig || !webhookSecret) {
+    console.error('[Stripe Webhook] Missing signature or webhook secret.');
+    return res.status(400).send('Webhook Error: Missing signature or secret');
+  }
+
+  let event;
+
+  try {
+    // Verify signature using the raw body captured in index.ts
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+  } catch (err: any) {
+    console.error(`[Stripe Webhook] Error: ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object as any;
+    const orderNumber = paymentIntent.metadata.orderNumber;
+
+    if (orderNumber) {
+      try {
+        await finalizeOrder(orderNumber, paymentIntent);
+        console.log(`[Stripe Webhook] Order ${orderNumber} finalized successfully.`);
+      } catch (err: any) {
+        console.error(`[Stripe Webhook] Failed to finalize order ${orderNumber}: ${err.message}`);
+      }
+    }
+  }
+
+  // Return a 200 response to acknowledge receipt of the event
+  res.json({ received: true });
+});
+
+/**
+ * Shared helper to finalize an order after successful payment.
+ */
+async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
+  const order = await prisma.order.findUnique({
+    where: { orderNumber },
+    include: { payment: true },
+  });
+
+  if (!order) throw new Error('Order not found.');
+  
+  // Idempotency check: If already confirmed, skip
+  if (order.status === 'CONFIRMED' || order.payment?.status === 'CAPTURED') {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Update payment record
+    await tx.payment.update({
+      where: { orderId: order.id },
+      data: {
+        status: 'CAPTURED',
+        paidAt: new Date(),
+        metadata: paymentMetadata as any,
+      },
+    });
+
+    // Update order status
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: 'CONFIRMED' },
+    });
+
+    // Clear cart for the user
+    const cart = await tx.cart.findUnique({ where: { userId: order.userId } });
+    if (cart) {
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    }
+  });
+}
+
 // ─── GET /api/v1/orders ───────────────────────────────────────────────────────
 orderRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
   const orders = await prisma.order.findMany({
@@ -212,13 +294,25 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
 orderRoutes.post('/:id/confirm-payment', authenticate, async (req: AuthRequest, res) => {
   const orderId = req.params.id;
   
-  const payment = await prisma.payment.findUnique({ where: { orderId } });
+  const payment = await prisma.payment.findUnique({ 
+    where: { orderId },
+    include: { order: true }
+  });
   
   if (!payment || payment.provider !== 'STRIPE' || !payment.providerPaymentId) {
     return res.status(400).json({ error: 'Invalid or missing Stripe payment record.' });
   }
 
   try {
+    // If order is already confirmed (e.g., via webhook), just return it
+    if (payment.status === 'CAPTURED' || payment.order.status === 'CONFIRMED') {
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { address: true, payment: true }
+        });
+        return res.json({ success: true, order });
+    }
+
     // Securely retrieve the payment intent from Stripe
     const pi = await stripe.paymentIntents.retrieve(payment.providerPaymentId);
     
@@ -227,29 +321,11 @@ orderRoutes.post('/:id/confirm-payment', authenticate, async (req: AuthRequest, 
     }
 
     // Finalize order logically and clear cart
-    const order = await prisma.$transaction(async (tx) => {
-       await tx.payment.update({
-         where: { orderId },
-         data: {
-           status: 'CAPTURED',
-           paidAt: new Date(),
-           metadata: pi as any
-         }
-       });
-
-       const updatedOrder = await tx.order.update({
-         where: { id: orderId },
-         data: { status: 'CONFIRMED' },
-         include: { address: true, payment: true }
-       });
-
-       // clear user cart
-       const cart = await tx.cart.findUnique({ where: { userId: req.userId } });
-       if (cart) {
-         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-       }
-
-       return updatedOrder;
+    await finalizeOrder(payment.order.orderNumber, pi);
+    
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { address: true, payment: true }
     });
 
     res.json({ success: true, order });
@@ -264,6 +340,19 @@ orderRoutes.post('/:id/capture-paypal', authenticate, validate(capturePaypalSche
   const { paypalOrderId } = req.body;
 
   try {
+    const payment = await prisma.payment.findUnique({
+      where: { orderId },
+      include: { order: true }
+    });
+
+    if (!payment || payment.status === 'CAPTURED') {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { address: true, payment: true }
+      });
+      return res.json({ success: !!order, order });
+    }
+
     // Capture the PayPal order
     const request = new (paypal.orders as any).OrdersCaptureRequest(paypalOrderId);
     request.requestBody({});
@@ -274,29 +363,11 @@ orderRoutes.post('/:id/capture-paypal', authenticate, validate(capturePaypalSche
     }
 
     // Finalize order logically and clear cart
-    const order = await prisma.$transaction(async (tx) => {
-       await tx.payment.update({
-         where: { orderId },
-         data: {
-           status: 'CAPTURED',
-           paidAt: new Date(),
-           metadata: response.result as any
-         }
-       });
+    await finalizeOrder(payment.order.orderNumber, response.result);
 
-       const updatedOrder = await tx.order.update({
-         where: { id: orderId },
-         data: { status: 'CONFIRMED' },
-         include: { address: true, payment: true }
-       });
-
-       // clear user cart
-       const cart = await tx.cart.findUnique({ where: { userId: req.userId } });
-       if (cart) {
-         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-       }
-
-       return updatedOrder;
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { address: true, payment: true }
     });
 
     res.json({ success: true, order });
