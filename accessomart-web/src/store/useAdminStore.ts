@@ -1,118 +1,211 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { adminApi } from '@/lib/api-client';
+import { 
+  ApiProduct, 
+  ApiOrder, 
+  ApiDashboardStats, 
+  OrderStatus,
+  ApiCategory,
+  ApiBrand,
+  ApiHomepageSection,
+  ApiAdminSettings
+} from '@/lib/api-types';
 
-export type HomepageSection = 'hero' | 'categories' | 'flash' | 'featured' | 'promo' | 'newsletter';
-
-export interface AdminProduct {
-  id: string;
-  name: string;
-  brand: string;
-  category: string;
-  price: number;
-  stock: number;
-  imageUrl: string;
-  status: 'active' | 'draft' | 'archived';
-}
-
-export type OrderStatus = 'Pending' | 'Confirmed' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
-
-export interface AdminOrder {
-  id: string;
-  customerName: string;
-  date: string;
-  total: number;
-  status: OrderStatus;
-  items: number;
-}
+export type HomepageSection = ApiHomepageSection;
 
 interface AdminState {
-  // Homepage Layout
-  homepageLayout: { id: HomepageSection; enabled: boolean }[];
+  // Stats
+  stats: ApiDashboardStats | null;
   
-  // PC Builder Settings
+  // Data
+  products: ApiProduct[];
+  orders: ApiOrder[];
+  categories: ApiCategory[];
+  brands: ApiBrand[];
+  
+  // Legacy UI Compatibility (to be replaced by real settings later)
   pcBuilderSettings: {
-    enabled: boolean;
     showInNav: boolean;
+    enabled: boolean;
   };
-  
-  // Product Management (Mock)
-  products: AdminProduct[];
-  
-  // Order Management (Mock)
-  orders: AdminOrder[];
+
+  // CMS
+  homepageLayout: HomepageSection[];
+
+  // UI State
+  isLoading: boolean;
+  error: string | null;
 
   // Actions
-  reorderSections: (newLayout: { id: HomepageSection; enabled: boolean }[]) => void;
-  toggleSection: (id: HomepageSection) => void;
-  updatePCBuilder: (settings: Partial<AdminState['pcBuilderSettings']>) => void;
+  fetchDashboard: () => Promise<void>;
+  fetchProducts: (params?: Record<string, string | number | boolean>) => Promise<void>;
+  fetchOrders: (params?: Record<string, string | number | boolean>) => Promise<void>;
+  fetchMetadata: () => Promise<void>;
   
-  // Product Actions
-  addProduct: (product: Omit<AdminProduct, 'id'>) => void;
-  updateProduct: (id: string, updates: Partial<AdminProduct>) => void;
-  deleteProduct: (id: string) => void;
+  // Product Mutations
+  createProduct: (data: Partial<ApiProduct>) => Promise<void>;
+  updateProduct: (id: string, data: Partial<ApiProduct>) => Promise<void>;
+  archiveProduct: (id: string) => Promise<void>;
   
-  // Order Actions
-  updateOrderStatus: (id: string, status: OrderStatus) => void;
+  // Order Mutations
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  
+  // CMS Actions
+  fetchHomepage: () => Promise<void>;
+  toggleSection: (id: string) => Promise<void>;
+  reorderSections: (sections: HomepageSection[]) => Promise<void>;
+  updatePCBuilder: (data: Partial<ApiAdminSettings>) => Promise<void>;
+
+  // Helpers
+  clearError: () => void;
 }
 
-export const useAdminStore = create<AdminState>()(
-  persist(
-    (set) => ({
-      homepageLayout: [
-        { id: 'hero', enabled: true },
-        { id: 'categories', enabled: true },
-        { id: 'flash', enabled: true },
-        { id: 'promo', enabled: true },
-        { id: 'featured', enabled: true },
-        { id: 'newsletter', enabled: true },
-      ],
-      pcBuilderSettings: {
-        enabled: true,
-        showInNav: true,
-      },
-      products: [
-        { id: 'p1', name: 'Obsidian Ghost K1', brand: 'Vanguard', category: 'Keyboards', price: 219.00, stock: 45, status: 'active', imageUrl: '/images/keyboard.png' },
-        { id: 'p2', name: 'SonicBlast H3', brand: 'AeroFlow', category: 'Audio', price: 159.00, stock: 32, status: 'active', imageUrl: '/images/headset.png' },
-        { id: 'p3', name: 'SwiftGlide X', brand: 'Reflex', category: 'Mice', price: 79.00, stock: 120, status: 'active', imageUrl: '/images/mouse.png' },
-      ],
-      orders: [
-        { id: 'ORD-2024-001', customerName: 'Alex Thorne', date: '2024-03-28', total: 2450.00, status: 'Processing', items: 5 },
-        { id: 'ORD-2024-002', customerName: 'Elena Vane', date: '2024-03-29', total: 159.00, status: 'Pending', items: 1 },
-        { id: 'ORD-2024-003', customerName: 'Marcus Chen', date: '2024-03-27', total: 899.00, status: 'Shipped', items: 3 },
-        { id: 'ORD-2024-004', customerName: 'Sara Novak', date: '2024-03-25', total: 429.00, status: 'Delivered', items: 2 },
-        { id: 'ORD-2024-005', customerName: 'Jordan Reeve', date: '2024-03-26', total: 219.00, status: 'Confirmed', items: 1 },
-      ],
+export const useAdminStore = create<AdminState>((set, get) => ({
+  stats: null,
+  products: [],
+  orders: [],
+  categories: [],
+  brands: [],
+  pcBuilderSettings: {
+    showInNav: true,
+    enabled: true,
+  },
+  homepageLayout: [],
+  isLoading: false,
+  error: null,
 
-      reorderSections: (newLayout) => set({ homepageLayout: newLayout }),
-      
-      toggleSection: (id) => set((state) => ({
-        homepageLayout: state.homepageLayout.map(s => 
-          s.id === id ? { ...s, enabled: !s.enabled } : s
-        )
-      })),
-
-      updatePCBuilder: (settings) => set((state) => ({
-        pcBuilderSettings: { ...state.pcBuilderSettings, ...settings }
-      })),
-
-      addProduct: (product) => set((state) => ({
-        products: [...state.products, { ...product, id: `p${state.products.length + 1}` }]
-      })),
-
-      updateProduct: (id, updates) => set((state) => ({
-        products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
-      })),
-
-      deleteProduct: (id) => set((state) => ({
-        products: state.products.filter(p => p.id !== id)
-      })),
-
-      updateOrderStatus: (id, status) => set((state) => ({
-        orders: state.orders.map(o => o.id === id ? { ...o, status } : o)
-      })),
-    }),
-    {
-      name: 'accessomart-admin-storage',
+  fetchDashboard: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { stats, recentOrders } = await adminApi.dashboard();
+      set({ stats, orders: recentOrders, isLoading: false });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to fetch dashboard stats', isLoading: false });
     }
-  )
-);
+  },
+
+  fetchProducts: async (params) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { products } = await adminApi.getProducts(params);
+      set({ products, isLoading: false });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to fetch products', isLoading: false });
+    }
+  },
+
+  fetchOrders: async (params) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { orders } = await adminApi.getOrders(params);
+      set({ orders, isLoading: false });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to fetch orders', isLoading: false });
+    }
+  },
+
+  fetchMetadata: async () => {
+    try {
+      const [catRes, brandRes] = await Promise.all([
+        adminApi.getCategories(),
+        adminApi.getBrands()
+      ]);
+      set({ categories: catRes.categories, brands: brandRes.brands });
+    } catch (err) {
+      console.error('Failed to fetch admin metadata:', err);
+    }
+  },
+
+  createProduct: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      await adminApi.createProduct(data);
+      await get().fetchProducts();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to create product', isLoading: false });
+      throw err;
+    }
+  },
+
+  updateProduct: async (id, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      await adminApi.updateProduct(id, data);
+      await get().fetchProducts();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to update product', isLoading: false });
+      throw err;
+    }
+  },
+
+  archiveProduct: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await adminApi.archiveProduct(id);
+      await get().fetchProducts();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to archive product', isLoading: false });
+      throw err;
+    }
+  },
+
+  updateOrderStatus: async (id, status) => {
+    set({ isLoading: true, error: null });
+    try {
+      await adminApi.updateOrderStatus(id, status);
+      await get().fetchOrders();
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to update order status', isLoading: false });
+      throw err;
+    }
+  },
+
+  fetchHomepage: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { sections } = await adminApi.getHomepage();
+      set({ homepageLayout: sections, isLoading: false });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Failed to fetch homepage layout', isLoading: false });
+    }
+  },
+
+  toggleSection: async (id) => {
+    const section = get().homepageLayout.find(s => s.id === id);
+    if (!section) return;
+    try {
+      const { section: updated } = await adminApi.updateSection(id, { isEnabled: !section.isEnabled });
+      set({
+        homepageLayout: get().homepageLayout.map(s => s.id === id ? updated : s)
+      });
+    } catch (err) {
+      console.error('Failed to toggle section:', err);
+    }
+  },
+
+  reorderSections: async (sections) => {
+    set({ homepageLayout: sections });
+  },
+
+  updatePCBuilder: async (data) => {
+    try {
+      if (data.pc_builder_enabled !== undefined) {
+        await adminApi.updateSetting('pc_builder_enabled', data.pc_builder_enabled);
+      }
+      if (data.pc_builder_show_in_nav !== undefined) {
+        await adminApi.updateSetting('pc_builder_show_in_nav', data.pc_builder_show_in_nav);
+      }
+      set({
+        pcBuilderSettings: {
+          ...get().pcBuilderSettings,
+          enabled: data.pc_builder_enabled ?? get().pcBuilderSettings.enabled,
+          showInNav: data.pc_builder_show_in_nav ?? get().pcBuilderSettings.showInNav,
+        }
+      });
+    } catch (err) {
+      console.error('Failed to update PC Builder settings:', err);
+    }
+  },
+
+  clearError: () => set({ error: null }),
+}));
