@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
@@ -20,6 +21,15 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -166,5 +176,78 @@ authRoutes.get('/me', authenticate, async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('[Auth:Me] Error:', err);
     return res.status(500).json({ error: 'Failed to fetch user profile.' });
+  }
+});
+
+// ─── POST /api/v1/auth/forgot-password ────────────────────────────────────────
+authRoutes.post('/forgot-password', loginLimiter, validate(forgotPasswordSchema), async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: hashedToken,
+          passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour
+        },
+      });
+
+      // In production, send an email. For now, log it clearly for development.
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      console.log('------------------------------------------------------------');
+      console.log(`[Auth:ForgotPassword] Reset Link for ${email}:`);
+      console.log(resetUrl);
+      console.log('------------------------------------------------------------');
+    }
+
+    // Always return success to avoid leaking user existence
+    return res.json({ message: 'If an account with that email exists, a reset link has been generated.' });
+  } catch (err) {
+    console.error('[Auth:ForgotPassword] Error:', err);
+    return res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+});
+
+// ─── POST /api/v1/auth/reset-password ───────────────────────────────────────────
+authRoutes.post('/reset-password', loginLimiter, validate(resetPasswordSchema), async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+        },
+      }),
+      // Invalidate all refresh tokens for this user
+      prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+    ]);
+
+    return res.json({ message: 'Password has been reset successfully. Please log in with your new password.' });
+  } catch (err) {
+    console.error('[Auth:ResetPassword] Error:', err);
+    return res.status(500).json({ error: 'Failed to reset password.' });
   }
 });

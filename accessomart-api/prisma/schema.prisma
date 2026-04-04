@@ -19,8 +19,10 @@ model User {
   isActive      Boolean        @default(true) @map("is_active")
   emailVerified Boolean        @default(false) @map("email_verified")
   createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  addresses     Address[]
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  passwordResetToken   String?        @unique @map("password_reset_token")
+  passwordResetExpires DateTime?      @map("password_reset_expires")
+  addresses             Address[]
   cart          Cart?
   orders        Order[]
   pcBuilds      PCBuild[]
