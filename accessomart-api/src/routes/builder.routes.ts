@@ -1,11 +1,31 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { z } from 'zod';
 
 export const builderRoutes = Router();
 
+// ─── SCHEMAS ──────────────────────────────────────────────────────────────────
+
+const pcBuildSchema = z.object({
+  name: z.string().min(1).optional(),
+  totalPrice: z.number().positive(),
+  compatibilityWarnings: z.array(z.string()).default([]),
+  components: z.array(z.object({
+    category: z.string().min(1),
+    variantId: z.string().min(1),
+    productId: z.string().min(1),
+    quantity: z.number().int().min(1).default(1),
+  })).min(1),
+});
+
+const wishlistSchema = z.object({
+  productId: z.string().min(1),
+});
+
 // ─── POST /api/v1/builder/save ────────────────────────────────────────────────
-builderRoutes.post('/save', authenticate, async (req: AuthRequest, res) => {
+builderRoutes.post('/save', authenticate, validate(pcBuildSchema), async (req: AuthRequest, res) => {
   const { name, components, totalPrice, compatibilityWarnings } = req.body;
   // components: { category, variantId, productId, quantity }[]
 
@@ -120,7 +140,7 @@ wishlistRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
   });
   return res.json({ items });
 });
-wishlistRoutes.post('/', authenticate, async (req: AuthRequest, res) => {
+wishlistRoutes.post('/', authenticate, validate(wishlistSchema), async (req: AuthRequest, res) => {
   const item = await prisma.wishlistItem.upsert({
     where: { userId_productId: { userId: req.userId!, productId: req.body.productId } },
     update: {},

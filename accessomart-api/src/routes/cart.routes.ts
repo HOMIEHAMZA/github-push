@@ -1,8 +1,21 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { z } from 'zod';
 
 export const cartRoutes = Router();
+
+// ─── SCHEMAS ──────────────────────────────────────────────────────────────────
+
+const cartItemSchema = z.object({
+  variantId: z.string().min(1),
+  quantity: z.number().int().min(1).default(1),
+});
+
+const cartItemUpdateSchema = z.object({
+  quantity: z.number().int().min(0),
+});
 
 // ─── GET /api/v1/cart ─────────────────────────────────────────────────────────
 cartRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
@@ -38,7 +51,7 @@ cartRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
 });
 
 // ─── POST /api/v1/cart/items ──────────────────────────────────────────────────
-cartRoutes.post('/items', authenticate, async (req: AuthRequest, res) => {
+cartRoutes.post('/items', authenticate, validate(cartItemSchema), async (req: AuthRequest, res) => {
   const { variantId, quantity = 1 } = req.body;
 
   // Get or create cart
@@ -88,7 +101,7 @@ cartRoutes.post('/items', authenticate, async (req: AuthRequest, res) => {
 });
 
 // ─── PATCH /api/v1/cart/items/:itemId ────────────────────────────────────────
-cartRoutes.patch('/items/:itemId', authenticate, async (req: AuthRequest, res) => {
+cartRoutes.patch('/items/:itemId', authenticate, validate(cartItemUpdateSchema), async (req: AuthRequest, res) => {
   const { quantity } = req.body;
 
   if (quantity <= 0) {

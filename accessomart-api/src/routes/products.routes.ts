@@ -1,8 +1,29 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { z } from 'zod';
 
 export const productRoutes = Router();
+
+// ─── SCHEMAS ──────────────────────────────────────────────────────────────────
+
+const productCreateSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  shortDesc: z.string().nullable().optional(),
+  brandId: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
+  basePrice: z.coerce.number().positive(),
+  comparePrice: z.coerce.number().positive().nullable().optional(),
+  costPrice: z.coerce.number().positive().nullable().optional(),
+  status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVED']).default('DRAFT'),
+  isFeatured: z.coerce.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+});
+
+const productUpdateSchema = productCreateSchema.partial();
 
 // ─── GET /api/v1/products ─────────────────────────────────────────────────────
 // Supports: ?category=slug&brand=slug&search=term&sort=price_asc|price_desc|newest|popular&page=1&limit=20&minPrice=10&maxPrice=100
@@ -133,20 +154,28 @@ productRoutes.get('/:slug', async (req, res) => {
 });
 
 // ─── POST /api/v1/products (Admin only) ───────────────────────────────────────
-productRoutes.post('/', authenticate, requireAdmin, async (req: AuthRequest, res) => {
-  const product = await prisma.product.create({
-    data: req.body,
-  });
-  return res.status(201).json({ product });
+productRoutes.post('/', authenticate, requireAdmin, validate(productCreateSchema), async (req: AuthRequest, res) => {
+  try {
+    const product = await prisma.product.create({
+      data: req.body as any,
+    });
+    return res.status(201).json({ product });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to create product', details: err.message });
+  }
 });
 
 // ─── PATCH /api/v1/products/:id (Admin only) ──────────────────────────────────
-productRoutes.patch('/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
-  const product = await prisma.product.update({
-    where: { id: req.params.id },
-    data: req.body,
-  });
-  return res.json({ product });
+productRoutes.patch('/:id', authenticate, requireAdmin, validate(productUpdateSchema), async (req: AuthRequest, res) => {
+  try {
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: req.body as any,
+    });
+    return res.json({ product });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to update product', details: err.message });
+  }
 });
 
 // ─── DELETE /api/v1/products/:id (Admin only) ─────────────────────────────────

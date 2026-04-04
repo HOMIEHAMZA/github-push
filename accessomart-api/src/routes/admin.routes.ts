@@ -3,11 +3,55 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 import { upload, cloudinary } from '../lib/cloudinary';
+import { validate } from '../middleware/validate.middleware';
 
 export const adminRoutes = Router();
 
 // All admin routes require auth + admin role
 adminRoutes.use(authenticate, requireAdmin);
+
+// ─── SCHEMAS ──────────────────────────────────────────────────────────────────
+
+const homepageSectionSchema = z.object({
+  title: z.string().nullable().optional(),
+  subtitle: z.string().nullable().optional(),
+  isEnabled: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  config: z.record(z.any()).optional(),
+});
+
+const adminSettingSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1).optional(),
+});
+
+const brandSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1).optional(),
+  logoUrl: z.string().url().nullable().optional(),
+  description: z.string().nullable().optional(),
+});
+
+const categorySchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  iconName: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  parentId: z.string().nullable().optional(),
+});
+
+const inventoryUpdateSchema = z.object({
+  quantity: z.number().int().min(0).optional(),
+  operation: z.enum(['set', 'adjust']).default('set'),
+});
+
+const orderStatusSchema = z.object({
+  status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
+});
 
 // ─── GET /api/v1/admin/dashboard ──────────────────────────────────────────────
 adminRoutes.get('/dashboard', async (_req, res) => {
@@ -59,12 +103,16 @@ adminRoutes.get('/homepage', async (_req, res) => {
   return res.json({ sections });
 });
 
-adminRoutes.patch('/homepage/:id', async (req, res) => {
-  const section = await prisma.homepageSection.update({
-    where: { id: req.params.id },
-    data: req.body,
-  });
-  return res.json({ section });
+adminRoutes.patch('/homepage/:id', validate(homepageSectionSchema), async (req: any, res) => {
+  try {
+    const section = await prisma.homepageSection.update({
+      where: { id: req.params.id },
+      data: req.body,
+    });
+    return res.json({ section });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to update section', details: err.message });
+  }
 });
 
 // ─── Admin Settings ───────────────────────────────────────────────────────────
@@ -74,13 +122,17 @@ adminRoutes.get('/settings', async (_req, res) => {
   return res.json({ settings: map });
 });
 
-adminRoutes.put('/settings/:key', async (req, res) => {
-  const setting = await prisma.adminSetting.upsert({
-    where: { key: req.params.key },
-    update: { value: req.body.value },
-    create: { key: req.params.key, value: req.body.value, label: req.body.label },
-  });
-  return res.json({ setting });
+adminRoutes.put('/settings/:key', validate(adminSettingSchema), async (req: any, res) => {
+  try {
+    const setting = await prisma.adminSetting.upsert({
+      where: { key: req.params.key },
+      update: { value: req.body.value },
+      create: { key: req.params.key, value: req.body.value, label: req.body.label },
+    });
+    return res.json({ setting });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to update setting', details: err.message });
+  }
 });
 
 // ─── Admin Orders ─────────────────────────────────────────────────────────────
@@ -150,14 +202,14 @@ adminRoutes.get('/brands', async (_req, res) => {
   }
 });
 
-adminRoutes.post('/brands', async (req, res) => {
+adminRoutes.post('/brands', validate(brandSchema), async (req: any, res) => {
   try {
     const brand = await prisma.brand.create({
       data: req.body,
     });
     return res.status(201).json({ brand });
-  } catch {
-    return res.status(500).json({ error: 'Failed to create brand' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to create brand', details: err.message });
   }
 });
 
@@ -170,11 +222,15 @@ adminRoutes.get('/categories', async (_req, res) => {
   return res.json({ categories });
 });
 
-adminRoutes.post('/categories', async (req, res) => {
-  const category = await prisma.category.create({
-    data: req.body,
-  });
-  return res.status(201).json({ category });
+adminRoutes.post('/categories', validate(categorySchema), async (req: any, res) => {
+  try {
+    const category = await prisma.category.create({
+      data: req.body,
+    });
+    return res.status(201).json({ category });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to create category', details: err.message });
+  }
 });
 
 // ─── Admin Products ───────────────────────────────────────────────────────────
@@ -632,7 +688,9 @@ const variantCreateSchema = z.object({
   lowStockThreshold: z.number().int().min(0).default(5),
 });
 
-adminRoutes.post('/variants', async (req, res) => {
+const variantUpdateSchema = variantCreateSchema.partial();
+
+adminRoutes.post('/variants', validate(variantCreateSchema), async (req: any, res) => {
   try {
     const data = variantCreateSchema.parse(req.body);
 
@@ -675,13 +733,13 @@ adminRoutes.post('/variants', async (req, res) => {
   }
 });
 
-adminRoutes.patch('/variants/:id', async (req, res) => {
+adminRoutes.patch('/variants/:id', validate(variantUpdateSchema), async (req: any, res) => {
   try {
     const { quantity, lowStockThreshold, ...variantData } = req.body;
 
     const variant = await prisma.productVariant.update({
       where: { id: req.params.id },
-      data: variantData,
+      data: variantData as any,
     });
 
     if (quantity !== undefined || lowStockThreshold !== undefined) {
@@ -705,8 +763,8 @@ adminRoutes.patch('/variants/:id', async (req, res) => {
   }
 });
 
-adminRoutes.patch('/inventory/:variantId', async (req, res) => {
-  const { quantity, operation } = req.body;
+adminRoutes.patch('/inventory/:variantId', validate(inventoryUpdateSchema), async (req: any, res) => {
+  const { quantity, operation = 'set' } = req.body;
 
   try {
     const inventory = await prisma.inventory.findUnique({
@@ -777,13 +835,8 @@ adminRoutes.get('/inventory/low-stock', async (_req, res) => {
 });
 
 // ─── Admin Order Management ───────────────────────────────────────────────────
-adminRoutes.patch('/orders/:id/status', async (req, res) => {
+adminRoutes.patch('/orders/:id/status', validate(orderStatusSchema), async (req: any, res) => {
   const { status } = req.body;
-
-  const validStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
-  }
 
   try {
     const updateData: any = { status };

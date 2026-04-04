@@ -1,11 +1,42 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest, requireAdmin } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { z } from 'zod';
 import { stripe } from '../lib/stripe';
 import { paypalClient } from '../lib/paypal';
 import paypal from '@paypal/checkout-server-sdk';
 
 export const orderRoutes = Router();
+
+// ─── SCHEMAS ──────────────────────────────────────────────────────────────────
+
+const checkoutSchema = z.object({
+  addressId: z.string().optional(),
+  addressData: z.object({
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    address: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().optional(),
+    postalCode: z.string().min(1),
+    country: z.string().optional(),
+  }).optional(),
+  paymentProvider: z.enum(['STRIPE', 'PAYPAL', 'COD']).default('STRIPE'),
+  couponCode: z.string().optional(),
+  notes: z.string().optional(),
+}).refine((data) => !!(data.addressId || data.addressData), {
+  message: "Either addressId or addressData must be provided",
+  path: ["addressId"]
+});
+
+const capturePaypalSchema = z.object({
+  paypalOrderId: z.string().min(1),
+});
+
+const orderStatusSchema = z.object({
+  status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
+});
 
 // ─── GET /api/v1/orders ───────────────────────────────────────────────────────
 orderRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
@@ -38,7 +69,7 @@ orderRoutes.get('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // ─── POST /api/v1/orders (Checkout) ──────────────────────────────────────────
-orderRoutes.post('/', authenticate, async (req: AuthRequest, res) => {
+orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRequest, res) => {
   const { addressId, addressData, paymentProvider = 'STRIPE', couponCode, notes } = req.body;
 
   // Fetch cart
@@ -228,13 +259,9 @@ orderRoutes.post('/:id/confirm-payment', authenticate, async (req: AuthRequest, 
 });
 
 // ─── POST /api/v1/orders/:id/capture-paypal ──────────────────────────────────
-orderRoutes.post('/:id/capture-paypal', authenticate, async (req: AuthRequest, res) => {
+orderRoutes.post('/:id/capture-paypal', authenticate, validate(capturePaypalSchema), async (req: AuthRequest, res) => {
   const orderId = req.params.id;
   const { paypalOrderId } = req.body;
-
-  if (!paypalOrderId) {
-    return res.status(400).json({ error: 'PayPal Order ID is required.' });
-  }
 
   try {
     // Capture the PayPal order
@@ -279,13 +306,8 @@ orderRoutes.post('/:id/capture-paypal', authenticate, async (req: AuthRequest, r
 });
 
 // ─── PATCH /api/v1/orders/:id/status (Admin only) ────────────────────────────
-orderRoutes.patch('/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+orderRoutes.patch('/:id/status', authenticate, requireAdmin, validate(orderStatusSchema), async (req: AuthRequest, res) => {
   const { status } = req.body;
-
-  const validStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
-  }
 
   try {
     const updateData: any = { status };
@@ -304,8 +326,8 @@ orderRoutes.patch('/:id/status', authenticate, requireAdmin, async (req: AuthReq
     });
 
     return res.json({ order });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Orders API] Status Update Error:', error);
-    return res.status(500).json({ error: 'Failed to update order status' });
+    return res.status(500).json({ error: 'Failed to update order status', details: error.message });
   }
 });
