@@ -8,7 +8,7 @@ import { apiLimiter } from './middleware/rate-limit.middleware';
 // Route imports
 import { authRoutes } from './routes/auth.routes';
 import { productRoutes } from './routes/products.routes';
-// import { categoryRoutes } from './routes/categories.routes';
+import { categoryRoutes } from './routes/categories.routes';
 import { orderRoutes } from './routes/orders.routes';
 import { cartRoutes } from './routes/cart.routes';
 // import { userRoutes } from './routes/users.routes';
@@ -61,7 +61,7 @@ const API = '/api/v1';
 
 app.use(`${API}/auth`, apiLimiter, authRoutes);
 app.use(`${API}/products`, apiLimiter, productRoutes);
-// app.use(`${API}/categories`, apiLimiter, categoryRoutes);
+app.use(`${API}/categories`, apiLimiter, categoryRoutes);
 app.use(`${API}/orders`, apiLimiter, orderRoutes);
 app.use(`${API}/cart`, apiLimiter, cartRoutes);
 // app.use(`${API}/users`, apiLimiter, userRoutes);

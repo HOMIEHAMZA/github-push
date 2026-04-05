@@ -256,6 +256,12 @@ const productCreateSchema = z.object({
   tags: z.array(z.string()).default([]),
   metaTitle: z.string().nullable().optional(),
   metaDesc: z.string().nullable().optional(),
+  specs: z.array(z.object({
+    groupName: z.string().nullable().optional(),
+    specKey: z.string().min(1),
+    specValue: z.string().min(1),
+    sortOrder: z.number().int().default(0),
+  })).optional(),
 });
 
 const productUpdateSchema = productCreateSchema.partial();
@@ -360,17 +366,22 @@ adminRoutes.post('/products', async (req, res) => {
     // Create product + default variant + inventory in one transaction so the
     // product appears in inventory immediately without manual intervention.
     const product = await prisma.$transaction(async (tx) => {
+      const { specs, ...rest } = data;
       const created = await tx.product.create({
         data: {
-          ...data,
+          ...rest,
           slug,
           status: data.status || 'DRAFT',
+          specs: specs && specs.length > 0 ? {
+            create: specs
+          } : undefined,
         } as any,
         include: {
           brand: true,
           category: true,
           images: true,
           variants: { include: { inventory: true } },
+          specs: true,
         },
       });
 
@@ -454,14 +465,22 @@ adminRoutes.patch('/products/:id', async (req, res) => {
 
     const data = productUpdateSchema.parse(body);
 
+    const { specs, ...rest } = data;
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: data as any,
+      data: {
+        ...rest,
+        specs: specs ? {
+          deleteMany: {},
+          create: specs
+        } : undefined
+      } as any,
       include: {
         brand: true,
         category: true,
         images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
         variants: { include: { inventory: true } },
+        specs: { orderBy: { sortOrder: 'asc' } },
       },
     });
 
