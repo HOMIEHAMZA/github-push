@@ -138,9 +138,10 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
         success = true;
         // Update snapshot after successful save
         previousOrder.current = orderToSave;
-      } catch (err: any) {
+      } catch (err: unknown) {
         attempt++;
-        const isDeadlock = err?.error?.includes('40P01') || err?.message?.includes('deadlock');
+        const e = err as { error?: string; message?: string };
+        const isDeadlock = e?.error?.includes('40P01') || e?.message?.includes('deadlock');
         
         if (isDeadlock && attempt < maxRetries) {
           // Wait before retry (exponential backoff)
@@ -230,7 +231,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
             Drag thumbnails to reorder · Hover for controls
           </p>
           <Reorder.Group
-            axis="x"
             values={images}
             onReorder={handleReorder}
             className="grid grid-cols-2 md:grid-cols-5 gap-4"
@@ -239,6 +239,7 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
               <Reorder.Item
                 key={image.id}
                 value={image}
+                layout
                 onDragEnd={handleDragEnd}
                 className={cn(
                   "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing select-none",
@@ -246,7 +247,13 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
                     ? "border-cyan-500 ring-2 ring-cyan-500/20"
                     : "border-slate-700 hover:border-cyan-500/50"
                 )}
-                whileDrag={{ scale: 1.05, zIndex: 10, boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}
+                transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                whileDrag={{ 
+                  scale: 1.05, 
+                  zIndex: 50, 
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                  backgroundColor: "rgba(15, 23, 42, 0.9)"
+                }}
               >
                 <Image
                   src={image.url}
