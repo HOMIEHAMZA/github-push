@@ -459,6 +459,38 @@ adminRoutes.patch('/products/:id', async (req, res) => {
 
     const { specs, variants, ...rest } = data;
     
+    // VALIDATION: Check for internal variant SKU duplicates within the selection
+    if (variants && variants.length > 0) {
+      const skus = variants.map(v => v.sku.trim());
+      const uniqueSkus = new Set(skus);
+      if (uniqueSkus.size !== skus.length) {
+        // Find which SKU is duplicated for more helpful messaging
+        const duplicates = skus.filter((sku, index) => skus.indexOf(sku) !== index);
+        return res.status(400).json({ 
+          error: 'Duplicate SKUs detected in form submission', 
+          details: `The SKU(s) [${[...new Set(duplicates)].join(', ')}] are repeated multiple times. Each variant must have a globally unique SKU.` 
+        });
+      }
+
+      // VALIDATION: Check for global SKU conflicts with OTHER products
+      // We don't check against this product because those will be either updated or replaced
+      const submittedSkus = variants.map(v => v.sku.trim());
+      const conflicts = await prisma.productVariant.findMany({
+        where: {
+          sku: { in: submittedSkus },
+          productId: { not: req.params.id }
+        },
+        select: { sku: true, product: { select: { name: true } } }
+      });
+
+      if (conflicts.length > 0) {
+        return res.status(400).json({
+          error: 'SKU conflict detected',
+          details: `The following SKUs are already in use by other products: ${conflicts.map(c => `${c.sku} (Product: ${c.product.name})`).join(', ')}`
+        });
+      }
+    }
+    
     const product = await prisma.$transaction(async (tx) => {
       // 1. Update basic product data and specs
       const updated = await tx.product.update({
@@ -467,7 +499,12 @@ adminRoutes.patch('/products/:id', async (req, res) => {
           ...rest,
           specs: specs ? {
             deleteMany: {},
-            create: specs as any
+            create: specs.map(s => ({
+              groupName: s.groupName,
+              specKey: s.specKey,
+              specValue: s.specValue,
+              sortOrder: s.sortOrder
+            }))
           } : undefined
         },
         include: {
@@ -552,12 +589,21 @@ adminRoutes.patch('/products/:id', async (req, res) => {
     });
 
     return res.json({ product });
-  } catch (error: any) {
-    console.error('[Admin PATCH /products/:id] Error:', JSON.stringify(error?.errors || error?.message || error));
+  } catch (err: unknown) {
+    const error = err as any;
+    console.error('[Admin PATCH /products/:id] Error:', error);
     
-    if (error instanceof z.ZodError) {
-      const details = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    if (err instanceof z.ZodError) {
+      const details = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
       return res.status(400).json({ error: 'Validation failed', details });
+    }
+
+    // Handle Prisma unique constraint for SKU if it bypasses our early check
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('sku')) {
+      return res.status(400).json({ 
+        error: 'SKU conflict detected', 
+        details: 'The specified SKU for one or more variants is already in use. Each variant must have a unique identifier.'
+      });
     }
     
     return res.status(400).json({ 

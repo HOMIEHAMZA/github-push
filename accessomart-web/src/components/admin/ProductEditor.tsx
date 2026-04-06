@@ -90,6 +90,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'specs' | 'variants' | 'images'>('basic');
   const [isSlugManual, setIsSlugManual] = useState(isEditing && !!product?.slug);
+  const [error, setError] = useState<string | null>(null);
 
   // Re-sync when the product prop changes
   useEffect(() => {
@@ -110,6 +111,11 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       setIsSlugManual(!!(product.id && product.slug));
     }
   }, [product]);
+
+  // Clear error when switching tabs or editing
+  useEffect(() => {
+    setError(null);
+  }, [activeTab, formData.name, formData.basePrice]);
 
   // Fetch full details
   useEffect(() => {
@@ -275,11 +281,24 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       variants: filteredVariants,
     };
 
+    // Final frontend validation for duplicate SKUs in the form itself
+    const skus = filteredVariants.map(v => v.sku);
+    const uniqueSkus = new Set(skus);
+    if (uniqueSkus.size !== skus.length) {
+      const duplicates = skus.filter((sku, index) => skus.indexOf(sku) !== index);
+      setError(`Duplicate SKUs detected: [${[...new Set(duplicates)].join(', ')}]. Each variant must have a unique SKU.`);
+      setActiveTab('variants');
+      return;
+    }
+
     try {
       setIsSaving(true);
+      setError(null);
       await onSave(payload);
     } catch (err: unknown) {
       console.error('ProductEditor submit error:', err);
+      const apiError = err as { response?: { data?: { details?: string; error?: string } }; message?: string };
+      setError(apiError.response?.data?.details || apiError.response?.data?.error || apiError.message || 'Failed to preserve asset data.');
     } finally {
       setIsSaving(false);
     }
@@ -699,7 +718,17 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-white/10 bg-white/5 flex items-center justify-end space-x-4">
+        <div className="px-8 py-6 border-t border-white/10 bg-white/5 flex items-center justify-between">
+          <div className="flex-1 mr-8">
+            {error && (
+              <div className="px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg animate-in fade-in slide-in-from-left-2 duration-300">
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest leading-relaxed">
+                  CRITICAL_ERROR: {error}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
           <button
             type="button"
             onClick={onCancel}
@@ -729,5 +758,6 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
