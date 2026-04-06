@@ -1,24 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, ShoppingCart, ShieldCheck, Zap, Truck } from 'lucide-react';
+import { Heart, ShoppingCart, ShieldCheck, Truck } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
 
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useToastStore } from '@/store/useToastStore';
+import { ApiProductVariant } from '@/lib/api-types';
 
 interface ProductPurchaseBlockProps {
   productId: string;
-  variantId: string;
-  price: number;
-  originalPrice?: number;
-  stockStatus: 'IN_STOCK' | 'LIMITED_STOCK' | 'OUT_OF_STOCK';
+  variants: ApiProductVariant[];
   brand: string;
 }
 
-export function ProductPurchaseBlock({ productId, variantId, price, originalPrice, stockStatus, brand }: ProductPurchaseBlockProps) {
+export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurchaseBlockProps) {
   const { addItem, openDrawer } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const { addToast } = useToastStore();
@@ -26,10 +25,32 @@ export function ProductPurchaseBlock({ productId, variantId, price, originalPric
   const isWishlisted = isInWishlist(productId);
   const [quantity, setQuantity] = useState(1);
 
+  // Initialize with default variant or first available
+  const [selectedVariant, setSelectedVariant] = useState<ApiProductVariant>(
+    variants.find(v => v.isDefault) || variants[0]
+  );
+  const [isAdding, setIsAdding] = useState(false);
+
+  const stockStatus = selectedVariant?.inventory && selectedVariant.inventory.quantity > 10 
+    ? 'IN_STOCK' 
+    : selectedVariant?.inventory && selectedVariant.inventory.quantity > 0 
+      ? 'LIMITED_STOCK' 
+      : 'OUT_OF_STOCK';
+
   const stockInfo = {
     IN_STOCK: { label: 'Operational (In Stock)', color: 'text-primary' },
     LIMITED_STOCK: { label: 'Low Energy (Limited Stock)', color: 'text-yellow-400' },
     OUT_OF_STOCK: { label: 'Offline (Out of Stock)', color: 'text-red-500' }
+  };
+
+  // Group variants by attributes for selection UI
+  const colors = Array.from(new Set(variants.map(v => v.color).filter(Boolean)));
+  const sizes = Array.from(new Set(variants.map(v => v.size).filter(Boolean)));
+  const models = Array.from(new Set(variants.map(v => v.model).filter(Boolean)));
+
+  const handleVariantSelect = (type: 'color' | 'size' | 'model', value: string) => {
+    const match = variants.find(v => v[type] === value);
+    if (match) setSelectedVariant(match);
   };
 
   return (
@@ -48,31 +69,108 @@ export function ProductPurchaseBlock({ productId, variantId, price, originalPric
       {/* Pricing */}
       <div className="flex items-baseline gap-4">
         <span className="text-4xl lg:text-5xl font-display text-on-surface tracking-tight">
-          ${price.toLocaleString()}
+          ${Number(selectedVariant?.price || 0).toLocaleString()}
         </span>
-        {originalPrice && (
+        {selectedVariant?.comparePrice && Number(selectedVariant.comparePrice) > 0 && (
           <span className="text-xl text-on-surface-variant line-through opacity-50">
-            ${originalPrice.toLocaleString()}
+            ${Number(selectedVariant.comparePrice).toLocaleString()}
           </span>
         )}
       </div>
+
+      {/* Selection UI */}
+      {(colors.length > 1 || sizes.length > 1 || models.length > 1) && (
+        <div className="space-y-6 py-4 border-t border-b border-surface-container-highest/10">
+          {colors.length > 1 && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Colorway</label>
+              <div className="flex flex-wrap gap-2">
+                {colors.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => handleVariantSelect('color', color!)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                      selectedVariant.color === color
+                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
+                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                    )}
+                  >
+                    {color}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sizes.length > 1 && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Size / Dimension</label>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map(size => (
+                  <button
+                    key={size}
+                    onClick={() => handleVariantSelect('size', size!)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                      selectedVariant.size === size
+                        ? "bg-primary text-black border-primary"
+                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                    )}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {models.length > 1 && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Model Revision</label>
+              <div className="flex flex-wrap gap-2">
+                {models.map(model => (
+                  <button
+                    key={model}
+                    onClick={() => handleVariantSelect('model', model!)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                      selectedVariant.model === model
+                        ? "bg-primary text-black border-primary"
+                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                    )}
+                  >
+                    {model}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quantity & Actions */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-surface-container rounded-lg border border-surface-container-highest/20 overflow-hidden">
             <button 
+              type="button"
+              title="Decrease quantity"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               className="px-4 py-2 hover:bg-surface-container-highest/20 text-on-surface-variant transition-colors"
             > - </button>
             <span className="px-6 py-2 text-on-surface font-mono w-16 text-center">{quantity}</span>
             <button 
+              type="button"
+              title="Increase quantity"
               onClick={() => setQuantity(quantity + 1)}
               className="px-4 py-2 hover:bg-surface-container-highest/20 text-on-surface-variant transition-colors"
             > + </button>
           </div>
           
           <button 
+            type="button"
+            title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             onClick={() => {
               toggleWishlist(productId);
               addToast(isWishlisted ? 'Removed from Wishlist' : 'Added to Wishlist', 'info');
@@ -90,17 +188,21 @@ export function ProductPurchaseBlock({ productId, variantId, price, originalPric
 
         <PrimaryButton 
           className="w-full bg-primary py-6 text-base tracking-[0.25em] h-auto shadow-[0_0_30px_rgba(143,245,255,0.15)]"
-          disabled={stockStatus === 'OUT_OF_STOCK'}
+          disabled={stockStatus === 'OUT_OF_STOCK' || isAdding}
+          title="Add to cart"
           onClick={async () => {
+            setIsAdding(true);
             try {
-              await addItem(variantId, quantity); // Use variantId for API interaction
+              if (!selectedVariant) throw new Error('Selection required');
+              await addItem(selectedVariant.id, quantity);
               addToast('Added to your loadout');
               openDrawer();
-            } catch (err: any) {
-              addToast(err?.message || 'Failed to add to cart', 'error');
+            } catch (err: unknown) {
+              console.error('Failed to add item to cart:', err);
+            } finally {
+              setIsAdding(false);
             }
           }}
-
         >
           <ShoppingCart size={20} className="mr-3" />
           CALIBRATE & ADD TO CART

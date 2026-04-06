@@ -12,7 +12,7 @@ export interface CartItem {
   price: number;
   cartId?: string;
   isCustomBuild?: boolean;
-  buildComponents?: any[];
+  buildComponents?: unknown[];
   buildName?: string;
 }
 
@@ -47,7 +47,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         cartId: apiItem.cartId,
         name: apiItem.variant.product.name,
         brand: apiItem.variant.product.brand?.name || 'Unknown',
-        imageUrl: apiItem.variant.product.images?.[0]?.url || apiItem.variant.imageUrl,
+        imageUrl: apiItem.variant.imageUrl || apiItem.variant.product.images?.[0]?.url || undefined,
         price: Number(apiItem.variant.price),
       }));
       set({ items: mappedItems, isLoading: false });
@@ -64,8 +64,9 @@ export const useCartStore = create<CartState>((set, get) => ({
       await get().initializeCart(); // Refresh cart to get the new total from server
       set({ isDrawerOpen: true });
       useToastStore.getState().addToast('Added to loadout', 'success');
-    } catch (error: any) {
-      const message = error.response?.status === 409 
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number } };
+      const message = err.response?.status === 409 
         ? 'Insufficient stock for this upgrade' 
         : 'Failed to sync with command center';
       useToastStore.getState().addToast(message, 'error');
@@ -103,8 +104,9 @@ export const useCartStore = create<CartState>((set, get) => ({
         ),
       }));
       await cartApi.updateItem(id, quantity);
-    } catch (error: any) {
-      const message = error.response?.status === 409 
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number } };
+      const message = err.response?.status === 409 
         ? 'Maximum available stock reached' 
         : 'Failed to update quantity';
       useToastStore.getState().addToast(message, 'error');

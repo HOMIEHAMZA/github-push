@@ -126,8 +126,12 @@ export interface ApiProductVariant {
   name: string;
   price: number;
   comparePrice?: number;
-  attributes: Record<string, string>;
-  imageUrl?: string;
+  color?: string | null;
+  size?: string | null;
+  model?: string | null;
+  isDefault: boolean;
+  attributes: Record<string, string | number | boolean | null>;
+  imageUrl?: string | null;
   isActive: boolean;
   inventory?: ApiInventory;
 }

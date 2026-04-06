@@ -13,7 +13,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ProductEditor } from '@/components/admin/ProductEditor';
+import { ProductEditor, PartialProductUpdate } from '@/components/admin/ProductEditor';
 import { ApiProduct, ApiBrand, ApiCategory } from '@/lib/api-types';
 import Image from 'next/image';
 
@@ -64,7 +64,7 @@ export default function ProductManager() {
     fetchMetadata();
   }, []);
 
-  const handleSave = async (formData: Partial<ApiProduct>) => {
+  const handleSave = async (formData: PartialProductUpdate) => {
     const isEditing = !!editingProduct;
     const originalProducts = [...products];
 
@@ -78,12 +78,12 @@ export default function ProductManager() {
         const optimistic = { ...editingProduct, ...saveData } as ApiProduct;
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? optimistic : p));
         
-        await adminApi.updateProduct(editingProduct.id, saveData);
+        await adminApi.updateProduct(editingProduct.id, saveData as unknown as Partial<ApiProduct>);
         addToast('Asset parameters updated', 'success');
         setEditingProduct(null);
       } else {
         // Create - no ID yet, so we wait for API
-        await adminApi.createProduct(formData);
+        await adminApi.createProduct(formData as unknown as Partial<ApiProduct>);
         addToast('New asset initialized successfully', 'success');
         setIsAdding(false);
       }

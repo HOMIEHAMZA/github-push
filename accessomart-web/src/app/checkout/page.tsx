@@ -160,14 +160,13 @@ function CheckoutContent() {
           setOrderNumber(res.order.orderNumber);
           clearCart();
           setStep('success');
-        } catch (err: any) {
-          alert(err.message || 'Failed to initiate deployment.');
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to initiate deployment.';
+          alert(message);
         } finally {
           setLoading(false);
         }
       } else {
-        // PayPal button handles the review -> success flow independently
-        // but we can add a manual trigger here if needed for some review-only logic
         alert("Please use the PayPal button below to complete your transaction.");
       }
     }
@@ -194,9 +193,10 @@ function CheckoutContent() {
       setOrderNumber(res.order.orderNumber);
       
       return res.clientSecret;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('PayPal createOrder error:', err);
-      alert(err.message || 'Failed to initiate PayPal deployment.');
+      const message = err instanceof Error ? err.message : 'Failed to initiate PayPal deployment.';
+      alert(message);
       throw err;
     }
   };
@@ -210,9 +210,10 @@ function CheckoutContent() {
       
       clearCart();
       setStep('success');
-    } catch (err: any) {
+    } catch (err: unknown) {
        console.error('PayPal Approve Error:', err);
-       alert(err.message || 'PayPal capture failed. Please contact support if your account was debited.');
+       const message = err instanceof Error ? err.message : 'PayPal capture failed. Please contact support if your account was debited.';
+       alert(message);
     } finally {
       setLoading(false);
     }
@@ -260,7 +261,6 @@ function CheckoutContent() {
   return (
     <div className="container mx-auto px-6 py-12">
       <div className="flex flex-col gap-12">
-        {/* Header & Steps */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div>
             <Link href="/cart" className="inline-flex items-center gap-2 text-sm text-primary font-bold tracking-widest uppercase mb-4 hover:opacity-70 transition-opacity">
@@ -270,11 +270,10 @@ function CheckoutContent() {
             <h1 className="text-4xl font-display font-bold text-on-surface tracking-tight uppercase">Checkout Terminal</h1>
           </div>
           
-          {/* Step Indicator */}
           <div className="flex items-center gap-4">
             {(['shipping', 'payment', 'review'] as const).map((s, idx) => (
               <React.Fragment key={s}>
-                <div className={`flex items-center gap-2`}>
+                <div className="flex items-center gap-2">
                   <div className={`
                     w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
                     ${step === s ? 'bg-primary text-on-primary shadow-[0_0_15px_rgba(143,245,255,0.4)]' : 
@@ -286,14 +285,13 @@ function CheckoutContent() {
                     {s}
                   </span>
                 </div>
-                {idx < 2 && <div className="w-8 h-[1px] bg-surface-container-highest/10" />}
+                {idx < 2 && <div className="w-8 h-px bg-surface-container-highest/10" />}
               </React.Fragment>
             ))}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Form Area */}
           <div className="lg:col-span-7 space-y-8">
             <AnimatePresence mode="wait">
               {step === 'shipping' && (
@@ -526,7 +524,7 @@ function CheckoutContent() {
                     </button>
                     <button
                       onClick={nextStep}
-                      className="flex-[2] flex items-center justify-center gap-2 bg-primary text-on-primary py-5 rounded-xl font-bold tracking-[0.2em] uppercase text-sm shadow-[0_0_20px_rgba(143,245,255,0.2)] hover:shadow-[0_0_30px_rgba(143,245,255,0.3)] transition-all"
+                      className="flex-2 flex items-center justify-center gap-2 bg-primary text-on-primary py-5 rounded-xl font-bold tracking-[0.2em] uppercase text-sm shadow-[0_0_20px_rgba(143,245,255,0.2)] hover:shadow-[0_0_30px_rgba(143,245,255,0.3)] transition-all"
                     >
                       REVIEW ORDER
                       <ArrowRight size={18} />
@@ -606,7 +604,7 @@ function CheckoutContent() {
                         <button
                           onClick={nextStep}
                           disabled={loading || !stripe}
-                          className="flex-[2] flex items-center justify-center gap-2 bg-primary text-on-primary py-5 rounded-xl font-bold tracking-[0.2em] uppercase text-sm shadow-[0_0_30px_rgba(143,245,255,0.3)] hover:shadow-[0_0_40px_rgba(143,245,255,0.5)] transition-all animate-pulse disabled:opacity-50 disabled:animate-none"
+                          className="flex-2 flex items-center justify-center gap-2 bg-primary text-on-primary py-5 rounded-xl font-bold tracking-[0.2em] uppercase text-sm shadow-[0_0_30px_rgba(143,245,255,0.3)] hover:shadow-[0_0_40px_rgba(143,245,255,0.5)] transition-all animate-pulse disabled:opacity-50 disabled:animate-none"
                         >
                           {loading ? 'PROCESSING...' : 'INITIATE DEPLOYMENT'}
                           {!loading && <Zap size={18} />}
@@ -631,11 +629,11 @@ function CheckoutContent() {
                   const name = item.isCustomBuild ? item.buildName : item.name;
                   const brand = item.isCustomBuild ? "Custom Build" : item.brand;
                   const price = item.price;
-                  const image = item.isCustomBuild ? "/images/components/case.png" : item.imageUrl;
+                  const image = item.isCustomBuild ? "/images/components/case.png" : (item.imageUrl || "/placeholder.png");
                   
                   return (
                     <div key={item.id} className="flex gap-4 items-center">
-                      <div className="w-16 h-16 bg-surface-container-highest/20 rounded-lg overflow-hidden flex-shrink-0 relative border border-white/5">
+                      <div className="w-16 h-16 bg-surface-container-highest/20 rounded-lg overflow-hidden shrink-0 relative border border-white/5">
                         <img src={image} alt={name || ""} className="w-full h-full object-cover opacity-80" />
                         <div className="absolute top-0 right-0 bg-primary/20 backdrop-blur-md text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-bl-lg">
                           x{item.quantity}

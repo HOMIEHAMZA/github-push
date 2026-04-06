@@ -1,18 +1,66 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, X, Save, Wand2, Plus } from 'lucide-react';
+import { Loader2, X, Save, Wand2, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { ApiProduct, ApiBrand, ApiCategory, ApiProductImage } from '@/lib/api-types';
 import { ImageUploader } from './ImageUploader';
 import { adminApi } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
+export type PartialProductUpdate = Omit<Partial<ApiProduct>, 'specs' | 'variants' | 'images' | 'brand' | 'category' | 'inventory'> & {
+  specs?: LocalSpec[];
+  variants?: LocalVariant[];
+  images?: ApiProductImage[];
+  brandId?: string | null;
+  categoryId?: string | null;
+};
+
 interface ProductEditorProps {
   product: Partial<ApiProduct> | null;
   brands: ApiBrand[];
   categories: ApiCategory[];
-  onSave: (product: Partial<ApiProduct>) => Promise<void>;
+  onSave: (product: PartialProductUpdate) => Promise<void>;
   onCancel: () => void;
+}
+
+interface LocalSpec {
+  id?: string;
+  groupName?: string | null;
+  specKey: string;
+  specValue: string;
+  sortOrder: number;
+}
+
+interface LocalVariant {
+  id: string;
+  productId?: string;
+  sku: string;
+  name: string;
+  price: number;
+  isDefault: boolean;
+  isActive: boolean;
+  color?: string | null;
+  size?: string | null;
+  model?: string | null;
+  attributes: Record<string, string | number | boolean | null>;
+  inventory?: {
+    quantity: number;
+    lowStockThreshold: number;
+  };
+}
+
+interface EditorFormData {
+  name: string;
+  slug: string;
+  brandId: string;
+  categoryId: string;
+  basePrice: number;
+  description: string;
+  shortDesc: string;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  images: ApiProductImage[];
+  specs: LocalSpec[];
+  variants: LocalVariant[];
 }
 
 function slugify(text: string): string {
@@ -25,7 +73,7 @@ function slugify(text: string): string {
 export function ProductEditor({ product, brands, categories, onSave, onCancel }: ProductEditorProps) {
   const isEditing = !!(product?.id);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EditorFormData>({
     name: product?.name || '',
     slug: product?.slug || '',
     brandId: product?.brand?.id || '',
@@ -33,10 +81,10 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     basePrice: Number(product?.basePrice || 0),
     description: product?.description || '',
     shortDesc: product?.shortDesc || '',
-    status: product?.status || 'DRAFT',
+    status: (product?.status || 'DRAFT') as 'ACTIVE' | 'DRAFT' | 'ARCHIVED',
     images: product?.images || [] as ApiProductImage[],
-    specs: product?.specs || [] as any[],
-    variants: product?.variants || [] as any[],
+    specs: (product?.specs || []).map((s: unknown) => ({ ...(s as LocalSpec) })),
+    variants: (product?.variants || []).map((v: unknown) => ({ ...(v as LocalVariant) })),
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -54,10 +102,10 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         basePrice: Number(product.basePrice || 0),
         description: product.description || '',
         shortDesc: product.shortDesc || '',
-        status: product.status || 'DRAFT',
+        status: (product.status || 'DRAFT') as 'ACTIVE' | 'DRAFT' | 'ARCHIVED',
         images: product.images || [],
-        specs: product.specs || [],
-        variants: product.variants || [],
+        specs: (product.specs || []).map((s: unknown) => ({ ...(s as LocalSpec) })),
+        variants: (product.variants || []).map((v: unknown) => ({ ...(v as LocalVariant) })),
       });
       setIsSlugManual(!!(product.id && product.slug));
     }
@@ -74,8 +122,8 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         setFormData(prev => ({
           ...prev,
           images: res.product.images || prev.images,
-          specs: res.product.specs || prev.specs,
-          variants: res.product.variants || prev.variants,
+          specs: (res.product.specs || []).map((s: LocalSpec) => ({ ...s })),
+          variants: (res.product.variants || []).map((v: LocalVariant) => ({ ...v })),
         }));
       }
     }).catch(err => {
@@ -131,13 +179,53 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     });
   };
 
-  const handleVariantAttrChange = (variantIndex: number, key: string, value: string) => {
+
+  const handleVariantChange = (variantIndex: number, field: string, value: string | number | boolean | object | null) => {
     setFormData(prev => {
       const nextVariants = [...prev.variants];
-      const nextAttrs = { ...nextVariants[variantIndex].attributes, [key]: value };
-      nextVariants[variantIndex] = { ...nextVariants[variantIndex], attributes: nextAttrs };
+      nextVariants[variantIndex] = { ...nextVariants[variantIndex], [field]: value };
       return { ...prev, variants: nextVariants };
     });
+  };
+
+  const handleAddVariant = () => {
+    const skuBase = formData.slug || slugify(formData.name);
+    const newVariant: LocalVariant = {
+      id: `new-${Date.now()}`,
+      sku: `${skuBase}-${formData.variants.length + 1}`,
+      name: 'New Variant',
+      price: formData.basePrice,
+      isDefault: formData.variants.length === 0,
+      isActive: true,
+      color: '',
+      size: '',
+      model: '',
+      attributes: {},
+      inventory: { quantity: 0, lowStockThreshold: 5 }
+    };
+    setFormData(prev => ({ ...prev, variants: [...prev.variants, newVariant] }));
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    if (formData.variants.length <= 1) return;
+    setFormData(prev => {
+      const nextVariants = prev.variants.filter((_, i) => i !== index);
+      // If we removed the default one, pick the first remaining as default
+      if (prev.variants[index].isDefault && nextVariants.length > 0) {
+        nextVariants[0] = { ...nextVariants[0], isDefault: true };
+      }
+      return { ...prev, variants: nextVariants };
+    });
+  };
+
+  const handleSetDefaultVariant = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.map((v, i) => ({
+        ...v,
+        isDefault: i === index
+      }))
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,15 +242,15 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       .filter((spec: { specKey?: string; specValue?: string }) => 
         spec.specKey?.trim() && spec.specValue?.trim()
       )
-      .map((spec: { id?: string; groupName?: string; specKey: string; specValue: string; sortOrder?: number }) => ({
-        id: spec.id,
-        groupName: spec.groupName?.trim() || null,
-        specKey: spec.specKey.trim(),
-        specValue: spec.specValue.trim(),
+      .map(spec => ({
+        ...(spec.id ? { id: spec.id } : {}),
+        groupName: spec.groupName,
+        specKey: spec.specKey,
+        specValue: spec.specValue,
         sortOrder: spec.sortOrder
       }));
 
-    const payload: any = {
+    const payload: PartialProductUpdate = {
       ...formData,
       slug: finalSlug,
       brandId: formData.brandId || null,
@@ -171,12 +259,13 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       shortDesc: formData.shortDesc || '',
       basePrice: Number(formData.basePrice),
       specs: filteredSpecs,
+      variants: formData.variants,
     };
 
     try {
       setIsSaving(true);
       await onSave(payload);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('ProductEditor submit error:', err);
     } finally {
       setIsSaving(false);
@@ -215,7 +304,8 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              type="button"
+              onClick={() => setActiveTab(tab.id as 'basic' | 'specs' | 'variants' | 'images')}
               className={cn(
                 "py-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all border-b-2",
                 activeTab === tab.id ? "text-primary border-primary" : "text-zinc-500 border-transparent hover:text-zinc-300"
@@ -234,8 +324,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                 <div className="space-y-6">
                   {/* Name */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Asset Name *</label>
+                    <label htmlFor="pdp-name" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Asset Name *</label>
                     <input
+                      id="pdp-name"
                       type="text"
                       required
                       placeholder="e.g. GMMK Pro White Ice"
@@ -248,8 +339,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                   {/* Brand + Category */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand</label>
+                      <label htmlFor="pdp-brand" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand</label>
                       <select
+                        id="pdp-brand"
                         className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all appearance-none"
                         value={formData.brandId}
                         onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
@@ -262,8 +354,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Category</label>
+                      <label htmlFor="pdp-category" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Category</label>
                       <select
+                        id="pdp-category"
                         className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all appearance-none"
                         value={formData.categoryId}
                         onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
@@ -281,7 +374,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between ml-1">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Slug</label>
+                        <label htmlFor="pdp-slug" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Slug</label>
                         {isSlugManual ? (
                           <button
                             type="button"
@@ -296,6 +389,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                         )}
                       </div>
                       <input
+                        id="pdp-slug"
                         type="text"
                         placeholder="auto-generated"
                         className={cn(
@@ -307,8 +401,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Base Price ($) *</label>
+                      <label htmlFor="pdp-base-price" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Base Price ($) *</label>
                       <input
+                        id="pdp-base-price"
                         type="number"
                         step="0.01"
                         min="0.01"
@@ -321,11 +416,12 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Terminal Status</label>
+                    <label htmlFor="pdp-status" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Terminal Status</label>
                     <select
+                      id="pdp-status"
                       className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all appearance-none"
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'DRAFT' | 'ARCHIVED' })}
                     >
                       <option value="DRAFT">DRAFT</option>
                       <option value="ACTIVE">ACTIVE</option>
@@ -337,8 +433,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                 <div className="space-y-6">
                   {/* Short Desc */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Short Protocol Abstract</label>
+                    <label htmlFor="pdp-short-desc" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Short Protocol Abstract</label>
                     <textarea
+                      id="pdp-short-desc"
                       placeholder="High-level summary (1-2 sentences)..."
                       className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary min-h-[80px] transition-all resize-none"
                       value={formData.shortDesc}
@@ -348,8 +445,9 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
 
                   {/* Main Description */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Full System Documentation</label>
+                    <label htmlFor="pdp-description" className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Full System Documentation</label>
                     <textarea
+                      id="pdp-description"
                       placeholder="Detailed asset specifications and documentation..."
                       className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary min-h-[180px] transition-all resize-none"
                       value={formData.description}
@@ -380,30 +478,37 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                       <p className="text-xs uppercase tracking-widest">No parameters defined</p>
                     </div>
                   )}
-                  {formData.specs.map((spec, idx) => (
+                  {formData.specs.map((spec: LocalSpec, idx: number) => (
                     <div key={idx} className="flex gap-4 p-4 bg-black/40 border border-white/5 rounded-2xl group">
                       <div className="grid grid-cols-3 gap-4 flex-1">
-                        <input
-                          placeholder="Group (e.g. Display)"
-                          className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
-                          value={spec.groupName || ''}
-                          onChange={(e) => handleSpecChange(idx, 'groupName', e.target.value)}
-                        />
-                        <input
-                          placeholder="Key (e.g. Resolution)"
-                          className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
-                          value={spec.specKey}
-                          onChange={(e) => handleSpecChange(idx, 'specKey', e.target.value)}
-                        />
-                        <input
-                          placeholder="Value (e.g. 4K OLED)"
-                          className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
-                          value={spec.specValue}
-                          onChange={(e) => handleSpecChange(idx, 'specValue', e.target.value)}
-                        />
+                          <label htmlFor={`spec-group-${idx}`} className="sr-only">Spec Group</label>
+                          <input
+                            id={`spec-group-${idx}`}
+                            placeholder="Group (e.g. Display)"
+                            className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                            value={spec.groupName || ''}
+                            onChange={(e) => handleSpecChange(idx, 'groupName', e.target.value)}
+                          />
+                          <label htmlFor={`spec-key-${idx}`} className="sr-only">Spec Key</label>
+                          <input
+                            id={`spec-key-${idx}`}
+                            placeholder="Key (e.g. Resolution)"
+                            className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                            value={spec.specKey}
+                            onChange={(e) => handleSpecChange(idx, 'specKey', e.target.value)}
+                          />
+                          <label htmlFor={`spec-value-${idx}`} className="sr-only">Spec Value</label>
+                          <input
+                            id={`spec-value-${idx}`}
+                            placeholder="Value (e.g. 4K OLED)"
+                            className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                            value={spec.specValue}
+                            onChange={(e) => handleSpecChange(idx, 'specValue', e.target.value)}
+                          />
                       </div>
                       <button
                         type="button"
+                        title="Remove parameter"
                         onClick={() => handleRemoveSpec(idx)}
                         className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
                       >
@@ -418,40 +523,140 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
             {activeTab === 'variants' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white uppercase tracking-tight">Variant Identity Matrix</h3>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Configure attributes for unique SKUs</p>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-tight">Variant Identity Matrix</h3>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Configure attributes, pricing and stock per variant</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddVariant}
+                    className="text-[10px] font-bold text-primary flex items-center gap-2 hover:bg-primary/10 px-4 py-2 rounded-lg transition-all"
+                  >
+                    <Plus size={14} />
+                    ADD VARIANT
+                  </button>
                 </div>
 
-                <div className="space-y-6">
-                  {!isEditing ? (
+                <div className="space-y-4">
+                  {formData.variants.length === 0 && (
                     <div className="py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-zinc-500">
-                      <p className="text-xs uppercase tracking-widest">Matrix initialization available after save</p>
+                      <p className="text-xs uppercase tracking-widest">No variants defined</p>
                     </div>
-                  ) : formData.variants.map((v, idx) => (
-                    <div key={v.id} className="p-6 bg-black/40 border border-white/5 rounded-2xl space-y-4">
+                  )}
+                  {formData.variants.map((v: LocalVariant, idx: number) => (
+                    <div key={v.id || idx} className={cn(
+                      "p-6 bg-black/40 border rounded-2xl transition-all space-y-6",
+                      v.isDefault ? "border-primary/40 shadow-[0_0_20px_rgba(var(--primary-rgb),0.05)]" : "border-white/5"
+                    )}>
+                      {/* Header */}
                       <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{v.sku}</span>
-                          <h4 className="text-xs font-bold text-white mt-1 uppercase">{v.name}</h4>
+                        <div className="flex items-center gap-4">
+                          <button
+                            type="button"
+                            title="Set as default variant"
+                            onClick={() => handleSetDefaultVariant(idx)}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all",
+                              v.isDefault 
+                                ? "bg-primary text-black" 
+                                : "bg-white/5 text-zinc-500 hover:bg-white/10"
+                            )}
+                          >
+                            {v.isDefault ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+                            {v.isDefault ? "DEFAULT" : "SET DEFAULT"}
+                          </button>
+                          <div className="h-4 w-px bg-white/10" />
+                          <div className="flex flex-col">
+                            <label htmlFor={`variant-sku-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">SKU IDENTIFIER</label>
+                            <input
+                              id={`variant-sku-${idx}`}
+                              className="bg-transparent border-none p-0 text-xs font-mono text-white outline-none focus:text-primary mt-1"
+                              value={v.sku}
+                              onChange={(e) => handleVariantChange(idx, 'sku', e.target.value)}
+                            />
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Current Inventory</p>
-                          <p className="text-sm font-mono text-white">{v.inventory?.quantity || 0} UNITS</p>
+                        
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            title="Remove variant"
+                            onClick={() => handleRemoveVariant(idx)}
+                            disabled={formData.variants.length <= 1}
+                            className="p-2 text-zinc-600 hover:text-red-500 transition-colors disabled:opacity-0"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-6">
-                        {['Color', 'Size', 'Model'].map(attrType => (
-                          <div key={attrType} className="space-y-2">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{attrType}</label>
+                      {/* Content Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="md:col-span-1 space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-name-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Variant Name</label>
                             <input
-                              placeholder={`e.g. ${attrType === 'Color' ? 'Obsidian' : attrType === 'Size' ? 'Full' : 'Wireless'}`}
+                              id={`variant-name-${idx}`}
                               className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
-                              value={v.attributes?.[attrType.toLowerCase()] || ''}
-                              onChange={(e) => handleVariantAttrChange(idx, attrType.toLowerCase(), e.target.value)}
+                              value={v.name}
+                              onChange={(e) => handleVariantChange(idx, 'name', e.target.value)}
                             />
                           </div>
-                        ))}
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-price-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Price ($)</label>
+                            <input
+                              id={`variant-price-${idx}`}
+                              type="number"
+                              step="0.01"
+                              className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                              value={v.price}
+                              onChange={(e) => handleVariantChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-stock-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Stock Position</label>
+                            <input
+                              id={`variant-stock-${idx}`}
+                              type="number"
+                              className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                              value={v.inventory?.quantity ?? 0}
+                              onChange={(e) => handleVariantChange(idx, 'inventory', { ...v.inventory, quantity: parseInt(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-3 grid grid-cols-3 gap-4 h-fit">
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-color-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Color</label>
+                            <input
+                              id={`variant-color-${idx}`}
+                              placeholder="e.g. Obsidian Black"
+                              className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                              value={v.color || ''}
+                              onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-size-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Size / Dimension</label>
+                            <input
+                              id={`variant-size-${idx}`}
+                              placeholder="e.g. XL / 27-inch"
+                              className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                              value={v.size || ''}
+                              onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor={`variant-model-${idx}`} className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Model / Revision</label>
+                            <input
+                              id={`variant-model-${idx}`}
+                              placeholder="e.g. v2 / Wireless"
+                              className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                              value={v.model || ''}
+                              onChange={(e) => handleVariantChange(idx, 'model', e.target.value)}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

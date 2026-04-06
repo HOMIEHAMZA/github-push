@@ -118,10 +118,7 @@ export default function ProductDetailPage() {
 
             <ProductPurchaseBlock 
               productId={product.id}
-              variantId={product.variants?.[0]?.id || product.id}
-              price={product.basePrice}
-              originalPrice={product.comparePrice}
-              stockStatus={product.status === 'ACTIVE' ? 'IN_STOCK' : 'OUT_OF_STOCK'}
+              variants={product.variants || []}
               brand={product.brand?.name || 'Accessomart'}
             />
           </div>

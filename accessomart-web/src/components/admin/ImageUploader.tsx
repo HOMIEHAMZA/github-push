@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { Reorder } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Upload, X, Trash2, Star, Loader2, GripVertical } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -98,12 +98,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   // Serialization refs to prevent overlapping parallel transactions (deadlock 40P01)
   const isReordering = useRef(false);
   const pendingOrder = useRef<ApiProductImage[] | null>(null);
-
-  // handleReorder is called by framer-motion on every intermediate frame.
-  // We ONLY update local state for fluid visual feedback.
-  const handleReorder = (newOrder: ApiProductImage[]) => {
-    onImagesChange(newOrder);
-  };
 
   /**
    * Syncs the current gallery state to the backend.
@@ -218,7 +212,7 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
           <X className="w-4 h-4 shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto hover:text-red-300 transition-colors" title="Dismiss error">
+          <button type="button" onClick={() => setError(null)} className="ml-auto hover:text-red-300 transition-colors" title="Dismiss error">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -226,79 +220,126 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
 
       {/* Gallery Grid with Drag-to-Reorder */}
       {images.length > 0 && (
-        <>
+        <div className="space-y-2">
           <p className="text-[10px] text-zinc-500 uppercase tracking-widest px-1">
             Drag thumbnails to reorder · Hover for controls
           </p>
-          <Reorder.Group
-            values={images}
-            onReorder={handleReorder}
-            className="grid grid-cols-2 md:grid-cols-5 gap-4"
+          <div 
+            id="image-grid-container" 
+            className="grid grid-cols-2 md:grid-cols-5 gap-4 relative"
           >
-            {images.map((image) => (
-              <Reorder.Item
-                key={image.id}
-                value={image}
-                layout
-                onDragEnd={handleDragEnd}
-                className={cn(
-                  "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing select-none",
-                  image.isPrimary
-                    ? "border-cyan-500 ring-2 ring-cyan-500/20"
-                    : "border-slate-700 hover:border-cyan-500/50"
-                )}
-                transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                whileDrag={{ 
-                  scale: 1.05, 
-                  zIndex: 50, 
-                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                  backgroundColor: "rgba(15, 23, 42, 0.9)"
-                }}
+            {images.map((image, index) => (
+              <div 
+                key={index + '-' + image.id}
+                className="relative aspect-square"
               >
-                <Image
-                  src={image.url}
-                  alt={image.altText || 'Product visual asset'}
-                  fill
-                  sizes="(max-width: 768px) 50vw, 20vw"
-                  className="object-cover pointer-events-none"
-                  draggable={false}
-                />
+                <motion.div
+                  layout
+                  drag
+                  dragSnapToOrigin
+                  onDragEnd={() => {
+                    handleDragEnd();
+                  }}
+                  onDrag={(_event, info) => {
+                    const container = document.getElementById('image-grid-container');
+                    if (!container) return;
+                    
+                    const children = Array.from(container.children);
+                    const draggedRect = children[index].getBoundingClientRect();
+                    const centerX = draggedRect.left + draggedRect.width / 2 + info.offset.x;
+                    const centerY = draggedRect.top + draggedRect.height / 2 + info.offset.y;
 
-                {/* Grip Icon */}
-                <div className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 backdrop-blur text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <GripVertical className="w-3.5 h-3.5" />
-                </div>
+                    let closestIndex = index;
+                    let minDistance = 100000;
 
-                {/* Primary Badge */}
-                {image.isPrimary && (
-                  <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[9px] font-bold uppercase tracking-wider shadow">
-                    Primary
-                  </div>
-                )}
+                    children.forEach((child, i) => {
+                      if (i === index) return;
+                      const rect = child.getBoundingClientRect();
+                      const cX = rect.left + rect.width / 2;
+                      const cY = rect.top + rect.height / 2;
+                      const distance = Math.sqrt(Math.pow(centerX - cX, 2) + Math.pow(centerY - cY, 2));
+                      
+                      // Use a forgiving distance (60% of thumbnail width) for swap detection
+                      if (distance < minDistance && distance < rect.width * 0.6) {
+                        minDistance = distance;
+                        closestIndex = i;
+                      }
+                    });
 
-                {/* Controls Overlay */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                  {!image.isPrimary && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setPrimary(image.id); }}
-                      className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-all hover:scale-110"
-                      title="Set as Primary"
-                    >
-                      <Star className="w-3.5 h-3.5" />
-                    </button>
+                    if (closestIndex !== index) {
+                      const newOrder = [...images];
+                      const item = newOrder[index];
+                      newOrder.splice(index, 1);
+                      newOrder.splice(closestIndex, 0, item);
+                      onImagesChange(newOrder);
+                    }
+                  }}
+                  whileDrag={{ 
+                    scale: 1.05, 
+                    zIndex: 50, 
+                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                  }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 450, 
+                    damping: 45, 
+                    mass: 1,
+                    layout: { duration: 0.2 }
+                  }}
+                  className={cn(
+                    "group relative w-full h-full rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing select-none",
+                    image.isPrimary
+                      ? "border-cyan-500 ring-2 ring-cyan-500/20"
+                      : "border-slate-700 hover:border-cyan-500/50"
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeImage(image.id); }}
-                    className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-red-500 transition-all hover:scale-110"
-                    title="Remove Image"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </Reorder.Item>
+                >
+                  <Image
+                    src={image.url}
+                    alt={image.altText || 'Product visual asset'}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 20vw"
+                    className="object-cover pointer-events-none"
+                    draggable={false}
+                  />
+
+                  {/* Grip Icon */}
+                  <div className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 backdrop-blur text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </div>
+
+                  {/* Primary Badge */}
+                  {image.isPrimary && (
+                    <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-cyan-500 text-slate-900 text-[9px] font-bold uppercase tracking-wider shadow">
+                      Primary
+                    </div>
+                  )}
+
+                  {/* Controls Overlay */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                    {!image.isPrimary && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setPrimary(image.id); }}
+                        className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-cyan-500 hover:text-slate-900 transition-all hover:scale-110"
+                        title="Set as Primary"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeImage(image.id); }}
+                      className="p-2 rounded-full bg-slate-800/90 text-slate-200 hover:bg-red-500 transition-all hover:scale-110"
+                      title="Remove Image"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
             ))}
-          </Reorder.Group>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

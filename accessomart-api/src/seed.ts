@@ -140,7 +140,8 @@ async function main() {
       }
     });
 
-    for (const vData of pData.variants) {
+    for (let i = 0; i < pData.variants.length; i++) {
+      const vData = pData.variants[i];
       const variant = await prisma.productVariant.create({
         data: {
           productId: product.id,
@@ -150,6 +151,10 @@ async function main() {
           attributes: vData.attributes,
           isActive: true,
           imageUrl: product.images.find(img => img.isPrimary)?.url || product.images[0]?.url,
+          isDefault: i === 0,
+          color: (vData.attributes as any).color || null,
+          size: (vData.attributes as any).size || null,
+          model: (vData.attributes as any).model || null,
         }
       });
 

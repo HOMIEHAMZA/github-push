@@ -395,6 +395,7 @@ adminRoutes.post('/products', async (req, res) => {
           name: 'Standard',
           price: data.basePrice,
           isActive: true,
+          isDefault: true,
         },
       });
 
@@ -702,10 +703,14 @@ const variantCreateSchema = z.object({
   productId: z.string(),
   sku: z.string().min(1),
   name: z.string().min(1),
-  price: z.number().positive(),
-  comparePrice: z.number().positive().optional(),
+  price: z.coerce.number().positive(),
+  comparePrice: z.coerce.number().positive().optional().nullable(),
+  color: z.string().optional().nullable(),
+  size: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  isDefault: z.boolean().default(false),
   attributes: z.record(z.any()).default({}),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().url().optional().nullable(),
   isActive: z.boolean().default(true),
   quantity: z.number().int().min(0).default(0),
   lowStockThreshold: z.number().int().min(0).default(5),
@@ -718,6 +723,14 @@ adminRoutes.post('/variants', validate(variantCreateSchema), async (req: any, re
     const data = variantCreateSchema.parse(req.body);
 
     const variant = await prisma.$transaction(async (tx) => {
+      // If this is set as default, unset others for this product
+      if (data.isDefault) {
+        await tx.productVariant.updateMany({
+          where: { productId: data.productId },
+          data: { isDefault: false },
+        });
+      }
+
       const createdVariant = await tx.productVariant.create({
         data: {
           productId: data.productId,
@@ -725,10 +738,14 @@ adminRoutes.post('/variants', validate(variantCreateSchema), async (req: any, re
           name: data.name,
           price: data.price,
           comparePrice: data.comparePrice,
+          color: data.color,
+          size: data.size,
+          model: data.model,
+          isDefault: data.isDefault,
           attributes: data.attributes,
           imageUrl: data.imageUrl,
           isActive: data.isActive,
-        },
+        } as any,
       });
 
       await tx.inventory.create({
@@ -748,11 +765,12 @@ adminRoutes.post('/variants', validate(variantCreateSchema), async (req: any, re
     });
 
     return res.status(201).json({ variant: variantWithInventory });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Admin API] Variant creation error:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
-    return res.status(500).json({ error: 'Failed to create variant' });
+    return res.status(500).json({ error: 'Failed to create variant', details: error.message });
   }
 });
 
@@ -760,20 +778,35 @@ adminRoutes.patch('/variants/:id', validate(variantUpdateSchema), async (req: an
   try {
     const { quantity, lowStockThreshold, ...variantData } = req.body;
 
-    const variant = await prisma.productVariant.update({
-      where: { id: req.params.id },
-      data: variantData as any,
-    });
+    const variant = await prisma.$transaction(async (tx) => {
+      const current = await tx.productVariant.findUnique({ where: { id: req.params.id } });
+      if (!current) throw new Error('Variant not found');
 
-    if (quantity !== undefined || lowStockThreshold !== undefined) {
-      await prisma.inventory.update({
-        where: { variantId: req.params.id },
-        data: {
-          ...(quantity !== undefined && { quantity }),
-          ...(lowStockThreshold !== undefined && { lowStockThreshold }),
-        },
+      // If updating to default, unset others
+      if (variantData.isDefault) {
+        await tx.productVariant.updateMany({
+          where: { productId: current.productId },
+          data: { isDefault: false },
+        });
+      }
+
+      const updated = await tx.productVariant.update({
+        where: { id: req.params.id },
+        data: variantData as any,
       });
-    }
+
+      if (quantity !== undefined || lowStockThreshold !== undefined) {
+        await tx.inventory.update({
+          where: { variantId: req.params.id },
+          data: {
+            ...(quantity !== undefined && { quantity }),
+            ...(lowStockThreshold !== undefined && { lowStockThreshold }),
+          },
+        });
+      }
+
+      return updated;
+    });
 
     const variantWithInventory = await prisma.productVariant.findUnique({
       where: { id: variant.id },
@@ -781,8 +814,47 @@ adminRoutes.patch('/variants/:id', validate(variantUpdateSchema), async (req: an
     });
 
     return res.json({ variant: variantWithInventory });
-  } catch {
-    return res.status(404).json({ error: 'Variant not found' });
+  } catch (error: any) {
+    console.error('[Admin API] Variant update error:', error);
+    return res.status(404).json({ error: error.message || 'Variant update failed' });
+  }
+});
+
+adminRoutes.delete('/variants/:id', async (req, res) => {
+  try {
+    const variantId = req.params.id;
+    
+    // Check if it's the last variant (cannot delete last variant)
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: { product: { include: { _count: { select: { variants: true } } } } }
+    });
+
+    if (!variant) return res.status(404).json({ error: 'Variant not found' });
+    if (variant.product._count.variants <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last variant of a product' });
+    }
+
+    await prisma.productVariant.delete({
+      where: { id: variantId }
+    });
+
+    // If we deleted the default variant, pick a new default
+    if (variant.isDefault) {
+      const nextVariant = await prisma.productVariant.findFirst({
+        where: { productId: variant.productId }
+      });
+      if (nextVariant) {
+        await prisma.productVariant.update({
+          where: { id: nextVariant.id },
+          data: { isDefault: true }
+        });
+      }
+    }
+
+    return res.json({ message: 'Variant deleted successfully' });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to delete variant', details: error.message });
   }
 });
 
