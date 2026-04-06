@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 export type PartialProductUpdate = Omit<Partial<ApiProduct>, 'specs' | 'variants' | 'images' | 'brand' | 'category' | 'inventory'> & {
   specs?: LocalSpec[];
-  variants?: LocalVariant[];
+  variants?: (Omit<LocalVariant, 'id'> & { id?: string })[];
   images?: ApiProductImage[];
   brandId?: string | null;
   categoryId?: string | null;
@@ -257,6 +257,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       )
       .map(v => ({
         ...v,
+        id: v.id?.startsWith('new-') ? undefined : v.id,
         sku: v.sku.trim(),
         name: v.name?.trim() || '',
         isActive: v.isActive !== false,

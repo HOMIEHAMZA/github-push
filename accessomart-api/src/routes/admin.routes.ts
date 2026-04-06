@@ -480,19 +480,23 @@ adminRoutes.patch('/products/:id', async (req, res) => {
 
       // 2. Sync variants if provided
       if (variants) {
-        const incomingWithIds = variants.filter(v => v.id).map(v => v.id as string);
+        // Collect IDs of existing records from payload - ignore temp IDs from frontend
+        const existingVariantIds = variants
+          .filter(v => v.id && !v.id.startsWith('new-'))
+          .map(v => v.id as string);
         
         // Delete variants that were removed in the UI
         await tx.productVariant.deleteMany({
           where: {
             productId: updated.id,
-            id: { notIn: incomingWithIds }
+            id: { notIn: existingVariantIds }
           }
         });
 
         // Loop and handle updates/creates
         for (const variantData of variants) {
           const { id: variantId, ...vRest } = variantData;
+          const isActualId = variantId && !variantId.startsWith('new-');
           
           // Map to match Prisma's expectation for productVariant
           const variantPayload = {
@@ -507,7 +511,7 @@ adminRoutes.patch('/products/:id', async (req, res) => {
             isActive: vRest.isActive,
           };
 
-          if (variantId) {
+          if (isActualId) {
             // Update existing
             await tx.productVariant.update({
               where: { id: variantId },
