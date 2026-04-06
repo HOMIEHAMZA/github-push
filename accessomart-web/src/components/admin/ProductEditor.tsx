@@ -83,7 +83,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
     });
 
     return () => { cancelled = true; };
-  }, [product?.id]);
+  }, [product?.id, isEditing]);
 
   const handleUpdateImages = useCallback((newImages: ApiProductImage[]) => {
     setFormData(prev => ({ ...prev, images: newImages }));
@@ -148,18 +148,27 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
 
     const finalSlug = formData.slug.trim() || slugify(formData.name);
 
-    // Filter out blank specs where key or value is missing or whitespace
-    const filteredSpecs = (formData.specs || []).filter(
-      (spec: any) => spec.specKey?.trim() && spec.specValue?.trim()
-    );
+    // Filter out rows that are missing Key or Value (after trimming)
+    // This handles fully blank rows AND partially blank rows (e.g. key but no value)
+    const filteredSpecs = (formData.specs || [])
+      .filter((spec: { specKey?: string; specValue?: string }) => 
+        spec.specKey?.trim() && spec.specValue?.trim()
+      )
+      .map((spec: { id?: string; groupName?: string; specKey: string; specValue: string; sortOrder?: number }) => ({
+        id: spec.id,
+        groupName: spec.groupName?.trim() || null,
+        specKey: spec.specKey.trim(),
+        specValue: spec.specValue.trim(),
+        sortOrder: spec.sortOrder
+      }));
 
     const payload: any = {
       ...formData,
       slug: finalSlug,
       brandId: formData.brandId || null,
       categoryId: formData.categoryId || null,
-      description: formData.description || null,
-      shortDesc: formData.shortDesc || null,
+      description: formData.description || '',
+      shortDesc: formData.shortDesc || '',
       basePrice: Number(formData.basePrice),
       specs: filteredSpecs,
     };

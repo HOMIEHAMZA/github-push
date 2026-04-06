@@ -24,8 +24,6 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Debounce ref — only fire reorder API after drag settles
-  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Keep a snapshot of the pre-drag order so we can revert on error
   const previousOrder = useRef<ApiProductImage[]>(images);
 
@@ -101,29 +99,29 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
   const isReordering = useRef(false);
   const pendingOrder = useRef<ApiProductImage[] | null>(null);
 
-  // Called on every drag frame — optimistic UI update only.
-  // API call is debounced and serialized to handle concurrency effectively.
+  // handleReorder is called by framer-motion on every intermediate frame.
+  // We ONLY update local state for fluid visual feedback.
   const handleReorder = (newOrder: ApiProductImage[]) => {
-    // 1. Optimistic update for fluid UI feel
     onImagesChange(newOrder);
-
-    // 2. Clear existing debounce
-    if (reorderTimer.current) clearTimeout(reorderTimer.current);
-
-    // 3. Set new debounce
-    reorderTimer.current = setTimeout(async () => {
-      // Logic: If already reordering, just update the "next in line" layout
-      if (isReordering.current) {
-        pendingOrder.current = newOrder;
-        return;
-      }
-
-      await executeSerializedReorder(newOrder);
-    }, 500);
   };
 
   /**
-   * Helper to perform serialized reorder with exponential backoff retry for deadlocks
+   * Syncs the current gallery state to the backend.
+   * Triggered only on drag end to minimize server load and eliminate jitter.
+   */
+  const handleDragEnd = async () => {
+    // If a sync is already active, queue this final layout to run once it finishes.
+    if (isReordering.current) {
+      pendingOrder.current = [...images];
+      return;
+    }
+
+    await executeSerializedReorder([...images]);
+  };
+
+  /**
+   * Helper to perform serialized reorder with exponential backoff retry for deadlocks.
+   * Only fires once per completed drag action.
    */
   const executeSerializedReorder = async (orderToSave: ApiProductImage[]) => {
     isReordering.current = true;
@@ -145,22 +143,22 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
         const isDeadlock = err?.error?.includes('40P01') || err?.message?.includes('deadlock');
         
         if (isDeadlock && attempt < maxRetries) {
-          // Wait before retry (exponential backoff: 200ms, 400ms...)
-          await new Promise(resolve => setTimeout(resolve, 200 * attempt));
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 300 * attempt));
           continue;
         }
 
         console.error('Reorder save failed after retries:', err);
         setError('Failed to save image order — changes reverted');
-        // Revert UI to the last known good state
+        // Revert UI to the last known good state if even retries fail
         onImagesChange(previousOrder.current);
-        success = true; // Stop loop even on final failure
+        success = true; 
       }
     }
 
     isReordering.current = false;
 
-    // After finishing, check if the user made more changes while we were working
+    // If another drag finished and queued while this was running, process the final state now.
     if (pendingOrder.current) {
       const nextOrder = pendingOrder.current;
       pendingOrder.current = null;
@@ -241,6 +239,7 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
               <Reorder.Item
                 key={image.id}
                 value={image}
+                onDragEnd={handleDragEnd}
                 className={cn(
                   "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-300 cursor-grab active:cursor-grabbing select-none",
                   image.isPrimary
