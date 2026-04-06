@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { stripe } from '../lib/stripe';
 import { paypalClient } from '../lib/paypal';
 import paypal from '@paypal/checkout-server-sdk';
+import { sendOrderConfirmationEmail } from '../lib/email';
 
 export const orderRoutes = Router();
 
@@ -85,7 +86,7 @@ orderRoutes.post('/webhook/stripe', async (req: any, res) => {
 async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
   const order = await prisma.order.findUnique({
     where: { orderNumber },
-    include: { payment: true },
+    include: { payment: true, items: true, user: true },
   });
 
   if (!order) throw new Error('Order not found.');
@@ -112,12 +113,30 @@ async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
       data: { status: 'CONFIRMED' },
     });
 
+    // Deduct stock based on order items
+    for (const item of order.items) {
+      await tx.inventory.updateMany({
+        where: { variantId: item.variantId },
+        data: { quantity: { decrement: item.quantity } }
+      });
+    }
+
     // Clear cart for the user
     const cart = await tx.cart.findUnique({ where: { userId: order.userId } });
     if (cart) {
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     }
   });
+
+  // Dispatch order confirmation email asynchronously
+  if (order.user) {
+    sendOrderConfirmationEmail(order.user.email, orderNumber, {
+      totalAmount: Number((order as any).total || 0),
+      name: order.user.firstName,
+    }).catch(err => {
+      console.error('[OrderFinalize] Failed to dispatch order confirmation email:', err);
+    });
+  }
 }
 
 // ─── GET /api/v1/orders ───────────────────────────────────────────────────────
@@ -170,6 +189,17 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
 
   if (!cart || cart.items.length === 0) {
     return res.status(400).json({ error: 'Cart is empty.' });
+  }
+
+  // Pre-checkout Stock Validation
+  for (const item of cart.items) {
+    if (!item.variant.inventory) {
+      return res.status(409).json({ error: `Product variant ${item.variant.name} is currently out of stock.` });
+    }
+    const available = item.variant.inventory.quantity - item.variant.inventory.reservedQty;
+    if (item.quantity > available) {
+      return res.status(409).json({ error: `Insufficient stock for ${item.variant.name}. Only ${available} available.` });
+    }
   }
 
   // Calculate totals

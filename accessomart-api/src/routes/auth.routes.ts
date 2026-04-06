@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 import { validate } from '../middleware/validate.middleware';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { loginLimiter } from '../middleware/rate-limit.middleware';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../lib/email';
 
 export const authRoutes = Router();
 
@@ -87,12 +88,7 @@ authRoutes.post('/register', loginLimiter, validate(registerSchema), async (req,
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
 
-    // In production, send an email. For now, log it clearly for development.
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
-    console.log('------------------------------------------------------------');
-    console.log(`[Auth:Register] Email Verification Link for ${email}:`);
-    console.log(verificationUrl);
-    console.log('------------------------------------------------------------');
+    await sendVerificationEmail(email, verificationToken);
 
     const { accessToken, refreshToken } = generateTokens(user.id, user.role);
     await prisma.refreshToken.create({
@@ -225,12 +221,7 @@ authRoutes.post('/forgot-password', loginLimiter, validate(forgotPasswordSchema)
         },
       });
 
-      // In production, send an email. For now, log it clearly for development.
-      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-      console.log('------------------------------------------------------------');
-      console.log(`[Auth:ForgotPassword] Reset Link for ${email}:`);
-      console.log(resetUrl);
-      console.log('------------------------------------------------------------');
+      await sendPasswordResetEmail(email, resetToken);
     }
 
     // Always return success to avoid leaking user existence
@@ -331,11 +322,7 @@ authRoutes.post('/resend-verification', loginLimiter, validate(resendVerificatio
         },
       });
 
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
-      console.log('------------------------------------------------------------');
-      console.log(`[Auth:ResendVerification] New Link for ${email}:`);
-      console.log(verificationUrl);
-      console.log('------------------------------------------------------------');
+      await sendVerificationEmail(email, verificationToken);
     }
 
     // Always return success to avoid leaking user existence
