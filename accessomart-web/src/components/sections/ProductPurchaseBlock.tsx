@@ -64,8 +64,8 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
     model: selectedVariant?.model || null
   });
 
-  // Calculate which options are available given current selections in OTHER dimensions
-  const getAvailableOptions = (dimension: 'color' | 'size' | 'model') => {
+  // Calculate which options are compatible with current selections in OTHER dimensions
+  const getCompatibleOptions = (dimension: 'color' | 'size' | 'model') => {
     return variants.filter(v => {
       // For the dimension we are checking, we don't filter by its own current selection
       const colorMatch = dimension === 'color' || !activeDimensions.color || !selections.color || v.color === selections.color;
@@ -75,27 +75,28 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
     }).map(v => v[dimension]).filter(Boolean) as string[];
   };
 
-  const availableOptions = {
-    colors: getAvailableOptions('color'),
-    sizes: getAvailableOptions('size'),
-    models: getAvailableOptions('model')
+  const compatibleOptions = {
+    colors: getCompatibleOptions('color'),
+    sizes: getCompatibleOptions('size'),
+    models: getCompatibleOptions('model')
   };
 
   const handleAttributeSelect = (dimension: 'color' | 'size' | 'model', value: string) => {
     const newSelections = { ...selections, [dimension]: value };
     
-    // Find if this new combination is valid
-    const match = variants.find(v => 
+    // 1. Try to find a variant that matches the new selection PLUS the other current selections
+    const perfectMatch = variants.find(v => 
       (!activeDimensions.color || v.color === newSelections.color) &&
       (!activeDimensions.size || v.size === newSelections.size) &&
       (!activeDimensions.model || v.model === newSelections.model)
     );
 
-    if (match) {
+    if (perfectMatch) {
       setSelections(newSelections);
-      setSelectedVariant(match);
+      setSelectedVariant(perfectMatch);
     } else {
-      // If the combination is invalid, we reset other selections to find a valid one with the new attribute
+      // 2. If the exact combination is invalid, find ANY variant that has this attribute
+      // and reset other selections to match it (re-calibration)
       const fallbackMatch = variants.find(v => v[dimension] === value);
       if (fallbackMatch) {
         const resetSelections = {
@@ -149,20 +150,19 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
               <div className="flex flex-wrap gap-2">
                 {allOptions.colors.map(color => {
                   const isSelected = selections.color === color;
-                  const isAvailable = availableOptions.colors.includes(color);
+                  const isCompatible = compatibleOptions.colors.includes(color);
                   return (
                     <button
                       key={color}
                       type="button"
-                      disabled={!isAvailable && !isSelected}
                       onClick={() => handleAttributeSelect('color', color)}
                       className={cn(
                         "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
                         isSelected
                           ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
-                          : isAvailable
+                          : isCompatible
                             ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                            : "bg-surface-container/30 border-white/5 text-on-surface-variant/40 hover:border-white/10"
                       )}
                     >
                       {color}
@@ -179,20 +179,19 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
               <div className="flex flex-wrap gap-2">
                 {allOptions.sizes.map(size => {
                   const isSelected = selections.size === size;
-                  const isAvailable = availableOptions.sizes.includes(size);
+                  const isCompatible = compatibleOptions.sizes.includes(size);
                   return (
                     <button
                       key={size}
                       type="button"
-                      disabled={!isAvailable && !isSelected}
                       onClick={() => handleAttributeSelect('size', size)}
                       className={cn(
                         "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
                         isSelected
                           ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
-                          : isAvailable
+                          : isCompatible
                             ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                            : "bg-surface-container/30 border-white/5 text-on-surface-variant/40 hover:border-white/10"
                       )}
                     >
                       {size}
@@ -209,20 +208,19 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
               <div className="flex flex-wrap gap-2">
                 {allOptions.models.map(model => {
                   const isSelected = selections.model === model;
-                  const isAvailable = availableOptions.models.includes(model);
+                  const isCompatible = compatibleOptions.models.includes(model);
                   return (
                     <button
                       key={model}
                       type="button"
-                      disabled={!isAvailable && !isSelected}
                       onClick={() => handleAttributeSelect('model', model)}
                       className={cn(
                         "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
                         isSelected
                           ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
-                          : isAvailable
+                          : isCompatible
                             ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                            : "bg-surface-container/30 border-white/5 text-on-surface-variant/40 hover:border-white/10"
                       )}
                     >
                       {model}
