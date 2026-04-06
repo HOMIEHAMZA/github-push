@@ -134,7 +134,7 @@ productRoutes.get('/:slug', async (req, res) => {
       category: true,
       images: { orderBy: { sortOrder: 'asc' } },
       variants: {
-        where: { isActive: true },
+        where: { isActive: { not: false } },
         include: { inventory: true },
         orderBy: { price: 'asc' },
       },

@@ -49,8 +49,27 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
   const models = Array.from(new Set(variants.map(v => v.model).filter(Boolean)));
 
   const handleVariantSelect = (type: 'color' | 'size' | 'model', value: string) => {
-    const match = variants.find(v => v[type] === value);
-    if (match) setSelectedVariant(match);
+    // Try to find a variant that matches the new selection PLUS the other current selections
+    const newSelections = {
+      color: selectedVariant?.color,
+      size: selectedVariant?.size,
+      model: selectedVariant?.model,
+      [type]: value
+    };
+
+    const perfectMatch = variants.find(v => 
+      v.color === newSelections.color && 
+      v.size === newSelections.size && 
+      v.model === newSelections.model
+    );
+
+    if (perfectMatch) {
+      setSelectedVariant(perfectMatch);
+    } else {
+      // Fallback: Just find the first one that matches the new clicked attribute
+      const fallbackMatch = variants.find(v => v[type] === value);
+      if (fallbackMatch) setSelectedVariant(fallbackMatch);
+    }
   };
 
   return (
@@ -79,19 +98,20 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
       </div>
 
       {/* Selection UI */}
-      {(colors.length > 1 || sizes.length > 1 || models.length > 1) && (
+      {variants.length > 1 && (
         <div className="space-y-6 py-4 border-t border-b border-surface-container-highest/10">
-          {colors.length > 1 && (
+          {colors.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Colorway</label>
               <div className="flex flex-wrap gap-2">
                 {colors.map(color => (
                   <button
                     key={color}
+                    type="button"
                     onClick={() => handleVariantSelect('color', color!)}
                     className={cn(
                       "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant.color === color
+                      selectedVariant?.color === color
                         ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
                         : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
                     )}
@@ -103,18 +123,19 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
             </div>
           )}
 
-          {sizes.length > 1 && (
+          {sizes.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Size / Dimension</label>
               <div className="flex flex-wrap gap-2">
                 {sizes.map(size => (
                   <button
                     key={size}
+                    type="button"
                     onClick={() => handleVariantSelect('size', size!)}
                     className={cn(
                       "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant.size === size
-                        ? "bg-primary text-black border-primary"
+                      selectedVariant?.size === size
+                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
                         : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
                     )}
                   >
@@ -125,22 +146,47 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
             </div>
           )}
 
-          {models.length > 1 && (
+          {models.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Model Revision</label>
               <div className="flex flex-wrap gap-2">
                 {models.map(model => (
                   <button
                     key={model}
+                    type="button"
                     onClick={() => handleVariantSelect('model', model!)}
                     className={cn(
                       "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant.model === model
-                        ? "bg-primary text-black border-primary"
+                      selectedVariant?.model === model
+                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
                         : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
                     )}
                   >
                     {model}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fallback for variants that use SKU/Name but no Color/Size/Model labels */}
+          {colors.length === 0 && sizes.length === 0 && models.length === 0 && (
+             <div className="space-y-3">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Options</label>
+              <div className="flex flex-wrap gap-2">
+                {variants.map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedVariant(v)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                      selectedVariant?.id === v.id
+                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
+                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                    )}
+                  >
+                    {v.name || v.sku}
                   </button>
                 ))}
               </div>
