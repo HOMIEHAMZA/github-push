@@ -148,6 +148,11 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
 
     const finalSlug = formData.slug.trim() || slugify(formData.name);
 
+    // Filter out blank specs where key or value is missing or whitespace
+    const filteredSpecs = (formData.specs || []).filter(
+      (spec: any) => spec.specKey?.trim() && spec.specValue?.trim()
+    );
+
     const payload: any = {
       ...formData,
       slug: finalSlug,
@@ -156,6 +161,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       description: formData.description || null,
       shortDesc: formData.shortDesc || null,
       basePrice: Number(formData.basePrice),
+      specs: filteredSpecs,
     };
 
     try {

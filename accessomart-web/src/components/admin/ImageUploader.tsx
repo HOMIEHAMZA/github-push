@@ -97,27 +97,75 @@ export function ImageUploader({ productId, images, onImagesChange }: ImageUpload
     }
   };
 
+  // Serialization refs to prevent overlapping parallel transactions (deadlock 40P01)
+  const isReordering = useRef(false);
+  const pendingOrder = useRef<ApiProductImage[] | null>(null);
+
   // Called on every drag frame — optimistic UI update only.
-  // API call is debounced to fire once dragging stops.
+  // API call is debounced and serialized to handle concurrency effectively.
   const handleReorder = (newOrder: ApiProductImage[]) => {
-    // Optimistic update
+    // 1. Optimistic update for fluid UI feel
     onImagesChange(newOrder);
 
-    // Debounce the API call
+    // 2. Clear existing debounce
     if (reorderTimer.current) clearTimeout(reorderTimer.current);
+
+    // 3. Set new debounce
     reorderTimer.current = setTimeout(async () => {
-      try {
-        const imageIds = newOrder.map(img => img.id);
-        await adminApi.reorderProductImages(productId, imageIds);
-        // Update snapshot after successful save
-        previousOrder.current = newOrder;
-      } catch (err: unknown) {
-        console.error('Reorder save failed:', err);
-        setError('Failed to save image order — changes reverted');
-        // Revert to snapshot
-        onImagesChange(previousOrder.current);
+      // Logic: If already reordering, just update the "next in line" layout
+      if (isReordering.current) {
+        pendingOrder.current = newOrder;
+        return;
       }
+
+      await executeSerializedReorder(newOrder);
     }, 500);
+  };
+
+  /**
+   * Helper to perform serialized reorder with exponential backoff retry for deadlocks
+   */
+  const executeSerializedReorder = async (orderToSave: ApiProductImage[]) => {
+    isReordering.current = true;
+    setError(null);
+
+    const maxRetries = 3;
+    let attempt = 0;
+    let success = false;
+
+    while (attempt < maxRetries && !success) {
+      try {
+        const imageIds = orderToSave.map(img => img.id);
+        await adminApi.reorderProductImages(productId, imageIds);
+        success = true;
+        // Update snapshot after successful save
+        previousOrder.current = orderToSave;
+      } catch (err: any) {
+        attempt++;
+        const isDeadlock = err?.error?.includes('40P01') || err?.message?.includes('deadlock');
+        
+        if (isDeadlock && attempt < maxRetries) {
+          // Wait before retry (exponential backoff: 200ms, 400ms...)
+          await new Promise(resolve => setTimeout(resolve, 200 * attempt));
+          continue;
+        }
+
+        console.error('Reorder save failed after retries:', err);
+        setError('Failed to save image order — changes reverted');
+        // Revert UI to the last known good state
+        onImagesChange(previousOrder.current);
+        success = true; // Stop loop even on final failure
+      }
+    }
+
+    isReordering.current = false;
+
+    // After finishing, check if the user made more changes while we were working
+    if (pendingOrder.current) {
+      const nextOrder = pendingOrder.current;
+      pendingOrder.current = null;
+      await executeSerializedReorder(nextOrder);
+    }
   };
 
   return (
