@@ -262,6 +262,18 @@ const productCreateSchema = z.object({
     specValue: z.string().min(1),
     sortOrder: z.number().int().default(0),
   })).optional(),
+  variants: z.array(z.object({
+    id: z.string().optional(),
+    sku: z.string().min(1),
+    name: z.string().optional(),
+    price: z.coerce.number().positive(),
+    comparePrice: z.coerce.number().positive().nullable().optional(),
+    color: z.string().nullable().optional(),
+    size: z.string().nullable().optional(),
+    model: z.string().nullable().optional(),
+    isDefault: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+  })).optional(),
 });
 
 const productUpdateSchema = productCreateSchema.partial();
@@ -443,46 +455,96 @@ adminRoutes.patch('/products/:id', async (req, res) => {
   try {
     const body = { ...req.body };
     
-    // Strip non-schema fields that the frontend might accidentally send
-    delete body.images;
-    delete body.variants;
-    delete body.brand;
-    delete body.category;
-    delete body.id;
-    delete body.createdAt;
-    delete body.updatedAt;
-
-    // Normalize empty strings to null for optional FK and text fields
-    const optionalStringFields = ['brandId', 'categoryId', 'description', 'shortDesc', 'metaTitle', 'metaDesc', 'slug'];
-    optionalStringFields.forEach(field => {
-      if (body[field] === '') body[field] = null;
-    });
-
-    // Normalize empty numeric strings to undefined so they are skipped in partial update
-    const numericFields = ['comparePrice', 'costPrice', 'weight'];
-    numericFields.forEach(field => {
-      if (body[field] === '' || body[field] === null) body[field] = undefined;
-    });
-
     const data = productUpdateSchema.parse(body);
 
-    const { specs, ...rest } = data;
-    const product = await prisma.product.update({
-      where: { id: req.params.id },
-      data: {
-        ...rest,
-        specs: specs ? {
-          deleteMany: {},
-          create: specs
-        } : undefined
-      } as any,
-      include: {
-        brand: true,
-        category: true,
-        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
-        variants: { include: { inventory: true } },
-        specs: { orderBy: { sortOrder: 'asc' } },
-      },
+    const { specs, variants, ...rest } = data;
+    
+    const product = await prisma.$transaction(async (tx) => {
+      // 1. Update basic product data and specs
+      const updated = await tx.product.update({
+        where: { id: req.params.id },
+        data: {
+          ...rest,
+          specs: specs ? {
+            deleteMany: {},
+            create: specs as any
+          } : undefined
+        },
+        include: {
+          brand: true,
+          category: true,
+          images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+          specs: { orderBy: { sortOrder: 'asc' } },
+        },
+      });
+
+      // 2. Sync variants if provided
+      if (variants) {
+        const incomingWithIds = variants.filter(v => v.id).map(v => v.id as string);
+        
+        // Delete variants that were removed in the UI
+        await tx.productVariant.deleteMany({
+          where: {
+            productId: updated.id,
+            id: { notIn: incomingWithIds }
+          }
+        });
+
+        // Loop and handle updates/creates
+        for (const variantData of variants) {
+          const { id: variantId, ...vRest } = variantData;
+          
+          // Map to match Prisma's expectation for productVariant
+          const variantPayload = {
+            sku: vRest.sku as string,
+            name: vRest.name || updated.name,
+            price: vRest.price as number,
+            comparePrice: vRest.comparePrice,
+            color: vRest.color,
+            size: vRest.size,
+            model: vRest.model,
+            isDefault: vRest.isDefault,
+            isActive: vRest.isActive,
+          };
+
+          if (variantId) {
+            // Update existing
+            await tx.productVariant.update({
+              where: { id: variantId },
+              data: variantPayload
+            });
+          } else {
+            // Create new
+            const created = await tx.productVariant.create({
+              data: {
+                ...variantPayload,
+                productId: updated.id, // Using Unchecked input is fine here
+              } as any
+            });
+            
+            // Critical: Initialize inventory for new variants so they are trackable
+            await tx.inventory.create({
+              data: {
+                variantId: created.id,
+                quantity: 0,
+                lowStockThreshold: 5,
+              }
+            });
+          }
+        }
+      }
+
+      // Re-fetch final state with full relations
+      return tx.product.findUnique({
+        where: { id: updated.id },
+        include: {
+          brand: true,
+          category: true,
+          images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+          variants: { include: { inventory: true }, orderBy: { createdAt: 'asc' } },
+          specs: { orderBy: { sortOrder: 'asc' } },
+        }
+      });
     });
 
     return res.json({ product });

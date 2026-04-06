@@ -70,9 +70,9 @@ export default function ProductManager() {
 
     try {
       if (isEditing && editingProduct?.id) {
-        // Strip image/variant arrays — these are managed by their own endpoints
+        // Strip image arrays and relational objects — variants and specs ARE included in saveData
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { images: _images, variants: _variants, brand: _brand, category: _category, ...saveData } = formData as ApiProduct;
+        const { images: _images, brand: _brand, category: _category, ...saveData } = formData as ApiProduct;
 
         // Optimistic update with existing data while we wait for API
         const optimistic = { ...editingProduct, ...saveData } as ApiProduct;

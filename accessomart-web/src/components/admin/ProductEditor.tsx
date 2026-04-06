@@ -250,6 +250,18 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
         sortOrder: spec.sortOrder
       }));
 
+    // Filter out variants with empty SKU or sub-zero prices
+    const filteredVariants = (formData.variants || [])
+      .filter((v: { sku: string; price: number }) => 
+        v.sku?.trim() && v.price > 0
+      )
+      .map(v => ({
+        ...v,
+        sku: v.sku.trim(),
+        name: v.name?.trim() || '',
+        isActive: v.isActive !== false,
+      }));
+
     const payload: PartialProductUpdate = {
       ...formData,
       slug: finalSlug,
@@ -259,7 +271,7 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
       shortDesc: formData.shortDesc || '',
       basePrice: Number(formData.basePrice),
       specs: filteredSpecs,
-      variants: formData.variants,
+      variants: filteredVariants,
     };
 
     try {
