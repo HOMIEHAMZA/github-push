@@ -43,34 +43,77 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
     OUT_OF_STOCK: { label: 'Offline (Out of Stock)', color: 'text-red-500' }
   };
 
-  // Group variants by attributes for selection UI
-  const colors = Array.from(new Set(variants.map(v => v.color).filter(Boolean)));
-  const sizes = Array.from(new Set(variants.map(v => v.size).filter(Boolean)));
-  const models = Array.from(new Set(variants.map(v => v.model).filter(Boolean)));
+  // Identify which attribute dimensions are active for this product
+  const activeDimensions = {
+    color: variants.some(v => v.color),
+    size: variants.some(v => v.size),
+    model: variants.some(v => v.model)
+  };
 
-  const handleVariantSelect = (type: 'color' | 'size' | 'model', value: string) => {
-    // Try to find a variant that matches the new selection PLUS the other current selections
-    const newSelections = {
-      color: selectedVariant?.color,
-      size: selectedVariant?.size,
-      model: selectedVariant?.model,
-      [type]: value
-    };
+  // Get all unique possible values for each dimension
+  const allOptions = {
+    colors: Array.from(new Set(variants.map(v => v.color).filter(Boolean))) as string[],
+    sizes: Array.from(new Set(variants.map(v => v.size).filter(Boolean))) as string[],
+    models: Array.from(new Set(variants.map(v => v.model).filter(Boolean))) as string[]
+  };
 
-    const perfectMatch = variants.find(v => 
-      v.color === newSelections.color && 
-      v.size === newSelections.size && 
-      v.model === newSelections.model
+  // Selection state for each dimension
+  const [selections, setSelections] = useState({
+    color: selectedVariant?.color || null,
+    size: selectedVariant?.size || null,
+    model: selectedVariant?.model || null
+  });
+
+  // Calculate which options are available given current selections in OTHER dimensions
+  const getAvailableOptions = (dimension: 'color' | 'size' | 'model') => {
+    return variants.filter(v => {
+      // For the dimension we are checking, we don't filter by its own current selection
+      const colorMatch = dimension === 'color' || !activeDimensions.color || !selections.color || v.color === selections.color;
+      const sizeMatch = dimension === 'size' || !activeDimensions.size || !selections.size || v.size === selections.size;
+      const modelMatch = dimension === 'model' || !activeDimensions.model || !selections.model || v.model === selections.model;
+      return colorMatch && sizeMatch && modelMatch;
+    }).map(v => v[dimension]).filter(Boolean) as string[];
+  };
+
+  const availableOptions = {
+    colors: getAvailableOptions('color'),
+    sizes: getAvailableOptions('size'),
+    models: getAvailableOptions('model')
+  };
+
+  const handleAttributeSelect = (dimension: 'color' | 'size' | 'model', value: string) => {
+    const newSelections = { ...selections, [dimension]: value };
+    
+    // Find if this new combination is valid
+    const match = variants.find(v => 
+      (!activeDimensions.color || v.color === newSelections.color) &&
+      (!activeDimensions.size || v.size === newSelections.size) &&
+      (!activeDimensions.model || v.model === newSelections.model)
     );
 
-    if (perfectMatch) {
-      setSelectedVariant(perfectMatch);
+    if (match) {
+      setSelections(newSelections);
+      setSelectedVariant(match);
     } else {
-      // Fallback: Just find the first one that matches the new clicked attribute
-      const fallbackMatch = variants.find(v => v[type] === value);
-      if (fallbackMatch) setSelectedVariant(fallbackMatch);
+      // If the combination is invalid, we reset other selections to find a valid one with the new attribute
+      const fallbackMatch = variants.find(v => v[dimension] === value);
+      if (fallbackMatch) {
+        const resetSelections = {
+          color: activeDimensions.color ? (fallbackMatch.color ?? null) : null,
+          size: activeDimensions.size ? (fallbackMatch.size ?? null) : null,
+          model: activeDimensions.model ? (fallbackMatch.model ?? null) : null
+        };
+        setSelections(resetSelections);
+        setSelectedVariant(fallbackMatch);
+      }
     }
   };
+
+  const selectedCombinationLabel = [
+    selections.color,
+    selections.size,
+    selections.model
+  ].filter(Boolean).join(' / ');
 
   return (
     <div className="flex flex-col gap-8 p-8 rounded-2xl bg-surface-container-low border border-surface-container-highest/10 shadow-xl">
@@ -100,77 +143,98 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
       {/* Selection UI */}
       {variants.length > 1 && (
         <div className="space-y-6 py-4 border-t border-b border-surface-container-highest/10">
-          {colors.length > 0 && (
+          {activeDimensions.color && allOptions.colors.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Colorway</label>
               <div className="flex flex-wrap gap-2">
-                {colors.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => handleVariantSelect('color', color!)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant?.color === color
-                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
-                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                    )}
-                  >
-                    {color}
-                  </button>
-                ))}
+                {allOptions.colors.map(color => {
+                  const isSelected = selections.color === color;
+                  const isAvailable = availableOptions.colors.includes(color);
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      disabled={!isAvailable && !isSelected}
+                      onClick={() => handleAttributeSelect('color', color)}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                        isSelected
+                          ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
+                          : isAvailable
+                            ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                      )}
+                    >
+                      {color}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {sizes.length > 0 && (
+          {activeDimensions.size && allOptions.sizes.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Size / Dimension</label>
               <div className="flex flex-wrap gap-2">
-                {sizes.map(size => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => handleVariantSelect('size', size!)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant?.size === size
-                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
-                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                    )}
-                  >
-                    {size}
-                  </button>
-                ))}
+                {allOptions.sizes.map(size => {
+                  const isSelected = selections.size === size;
+                  const isAvailable = availableOptions.sizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      disabled={!isAvailable && !isSelected}
+                      onClick={() => handleAttributeSelect('size', size)}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                        isSelected
+                          ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
+                          : isAvailable
+                            ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                      )}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {models.length > 0 && (
+          {activeDimensions.model && allOptions.models.length > 0 && (
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Model Revision</label>
               <div className="flex flex-wrap gap-2">
-                {models.map(model => (
-                  <button
-                    key={model}
-                    type="button"
-                    onClick={() => handleVariantSelect('model', model!)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
-                      selectedVariant?.model === model
-                        ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]"
-                        : "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
-                    )}
-                  >
-                    {model}
-                  </button>
-                ))}
+                {allOptions.models.map(model => {
+                  const isSelected = selections.model === model;
+                  const isAvailable = availableOptions.models.includes(model);
+                  return (
+                    <button
+                      key={model}
+                      type="button"
+                      disabled={!isAvailable && !isSelected}
+                      onClick={() => handleAttributeSelect('model', model)}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-xs font-medium border transition-all",
+                        isSelected
+                          ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]"
+                          : isAvailable
+                            ? "bg-surface-container border-surface-container-highest/20 text-on-surface-variant hover:border-white/20"
+                            : "bg-surface-container/30 border-dashed border-white/5 text-white/10 cursor-not-allowed"
+                      )}
+                    >
+                      {model}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* Fallback for variants that use SKU/Name but no Color/Size/Model labels */}
-          {colors.length === 0 && sizes.length === 0 && models.length === 0 && (
+          {!activeDimensions.color && !activeDimensions.size && !activeDimensions.model && (
              <div className="space-y-3">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Options</label>
               <div className="flex flex-wrap gap-2">
@@ -190,6 +254,15 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Display current combination for clarity */}
+          {selectedCombinationLabel && (
+            <div className="pt-2">
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-[0.2em] font-mono">
+                Current Configuration: <span className="text-primary">{selectedCombinationLabel}</span>
+              </p>
             </div>
           )}
         </div>

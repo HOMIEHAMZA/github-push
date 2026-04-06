@@ -14,6 +14,9 @@ export interface CartItem {
   isCustomBuild?: boolean;
   buildComponents?: unknown[];
   buildName?: string;
+  color?: string | null;
+  size?: string | null;
+  model?: string | null;
 }
 
 interface CartState {
@@ -49,6 +52,9 @@ export const useCartStore = create<CartState>((set, get) => ({
         brand: apiItem.variant.product.brand?.name || 'Unknown',
         imageUrl: apiItem.variant.imageUrl || apiItem.variant.product.images?.[0]?.url || undefined,
         price: Number(apiItem.variant.price),
+        color: apiItem.variant.color,
+        size: apiItem.variant.size,
+        model: apiItem.variant.model,
       }));
       set({ items: mappedItems, isLoading: false });
     } catch (error) {

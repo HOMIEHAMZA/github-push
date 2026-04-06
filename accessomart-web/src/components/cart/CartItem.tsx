@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Minus, Plus, Trash2 } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
+import { useCartStore, type CartItem as ICartItem } from '@/store/useCartStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -12,19 +12,22 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface CartItemProps {
-  item: {
-    id: string;
-    quantity: number;
-    isCustomBuild?: boolean;
-    buildComponents?: any[];
-    buildName?: string;
-    price?: number;
-  };
+  item: ICartItem;
   variant?: 'drawer' | 'page';
 }
 
 export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) => {
-  const { id, quantity, isCustomBuild, buildComponents, buildName, price, name, brand, imageUrl } = item as any;
+  const { 
+    id, 
+    quantity, 
+    isCustomBuild, 
+    buildComponents, 
+    buildName, 
+    price, 
+    name, 
+    brand, 
+    imageUrl 
+  } = item;
   const { updateQuantity, removeItem } = useCartStore();
 
   const displayName = isCustomBuild ? buildName : name;
@@ -65,9 +68,22 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
               {displayName}
             </h4>
             <p className="text-xs text-white/40 uppercase tracking-widest">{displayBrand}</p>
-            {isCustomBuild && buildComponents && (
+            {item.color || item.size || item.model ? (
+              <div className="flex gap-1.5 mt-1">
+                {[
+                  item.color,
+                  item.size,
+                  item.model
+                ].filter(Boolean).map((attr, idx, arr) => (
+                  <span key={idx} className="text-[10px] text-cyan-400/80 font-mono flex items-center">
+                    {attr}
+                    {idx < arr.length - 1 && <span className="mx-1 text-white/10">/</span>}
+                  </span>
+                ))}
+              </div>
+            ) : isCustomBuild && buildComponents && (
               <p className="text-[10px] text-cyan-400/60 mt-1 line-clamp-1 italic">
-                {buildComponents.length} Performance Modules
+                {(buildComponents as any[]).length} Performance Modules
               </p>
             )}
           </div>
@@ -78,11 +94,12 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
             ${(displayPrice * quantity).toFixed(2)}
           </p>
         </div>
-
+ 
         <div className="mt-auto flex items-center justify-between">
           <div className="flex items-center gap-1 bg-black/40 rounded-lg p-1 border border-white/5">
             <button
               onClick={() => updateQuantity(id, quantity - 1)}
+              title="Decrease quantity"
               className="p-1 rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors disabled:opacity-30"
               disabled={quantity <= 1}
             >
@@ -96,14 +113,16 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
             </span>
             <button
               onClick={() => updateQuantity(id, quantity + 1)}
+              title="Increase quantity"
               className="p-1 rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors"
             >
               <Plus size={isDrawer ? 14 : 16} />
             </button>
           </div>
-
+ 
           <button
             onClick={() => removeItem(id)}
+            title="Remove item"
             className="p-2 text-white/30 hover:text-red-400 transition-colors"
           >
             <Trash2 size={isDrawer ? 16 : 18} />
