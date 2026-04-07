@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, Truck, Zap, CheckCircle2, MapPin, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, Truck, Zap, CheckCircle2, MapPin, ChevronDown, ShoppingCart } from 'lucide-react';
 import { useCartStore, CartItem } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAddressStore } from '@/store/useAddressStore';
+import { useToastStore } from '@/store/useToastStore';
 import { ordersApi } from '@/lib/api-client';
 import { ApiAddress } from '@/lib/api-types';
 
@@ -48,6 +50,7 @@ function CheckoutContent() {
   const { items, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { addresses, fetchAddresses } = useAddressStore();
+  const { addToast } = useToastStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -166,7 +169,7 @@ function CheckoutContent() {
           setStep('success');
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to initiate deployment.';
-          alert(message);
+          addToast(message, 'error');
         } finally {
           setLoading(false);
         }
@@ -200,7 +203,7 @@ function CheckoutContent() {
     } catch (err: unknown) {
       console.error('PayPal createOrder error:', err);
       const message = err instanceof Error ? err.message : 'Failed to initiate PayPal deployment.';
-      alert(message);
+      addToast(message, 'error');
       throw err;
     }
   };
@@ -219,7 +222,7 @@ function CheckoutContent() {
     } catch (err: unknown) {
        console.error('PayPal Approve Error:', err);
        const message = err instanceof Error ? err.message : 'PayPal capture failed. Please contact support if your account was debited.';
-       alert(message);
+       addToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -231,6 +234,26 @@ function CheckoutContent() {
   };
 
   if (!mounted) return null;
+
+  if (items.length === 0 && step !== 'success') {
+    return (
+      <div className="container mx-auto px-6 py-20 min-h-[70vh] flex flex-col items-center justify-center text-center">
+        <div className="w-24 h-24 mb-6 bg-surface-container-highest/20 rounded-full flex items-center justify-center">
+          <ShoppingCart size={36} className="text-on-surface-variant opacity-50" />
+        </div>
+        <h1 className="text-3xl font-display font-bold text-on-surface mb-2">NO PAYLOAD DETECTED</h1>
+        <p className="text-on-surface-variant mb-8 max-w-sm text-sm">
+          Your inventory is empty. Please secure physical components from our catalog before initiating a checkout sequence.
+        </p>
+        <Link 
+          href="/"
+          className="bg-primary text-on-primary px-8 py-4 rounded-xl font-bold tracking-[0.2em] uppercase text-xs shadow-[0_0_20px_rgba(143,245,255,0.2)] hover:shadow-[0_0_30px_rgba(143,245,255,0.4)] transition-all"
+        >
+          RETURN TO NEXUS
+        </Link>
+      </div>
+    );
+  }
 
   if (step === 'success') {
     return (
@@ -680,7 +703,7 @@ function CheckoutContent() {
                   return (
                     <div key={item.id} className="flex gap-4 items-center">
                       <div className="w-16 h-16 bg-surface-container-highest/20 rounded-lg overflow-hidden shrink-0 relative border border-white/5">
-                        <img src={image} alt={name || ""} className="w-full h-full object-cover opacity-80" />
+                        <Image src={image} alt={name || ""} fill className="object-cover opacity-80" />
                         <div className="absolute top-0 right-0 bg-primary/20 backdrop-blur-md text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-bl-lg">
                           x{item.quantity}
                         </div>
