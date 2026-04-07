@@ -88,7 +88,9 @@ authRoutes.post('/register', loginLimiter, validate(registerSchema), async (req,
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
 
-    await sendVerificationEmail(email, verificationToken);
+    sendVerificationEmail(email, verificationToken).catch(err => {
+      console.error('[Auth:Register] Non-blocking email delivery failed:', err);
+    });
 
     const { accessToken, refreshToken } = generateTokens(user.id, user.role);
     await prisma.refreshToken.create({
@@ -221,7 +223,9 @@ authRoutes.post('/forgot-password', loginLimiter, validate(forgotPasswordSchema)
         },
       });
 
-      await sendPasswordResetEmail(email, resetToken);
+      sendPasswordResetEmail(email, resetToken).catch(err => {
+        console.error('[Auth:ForgotPassword] Non-blocking email delivery failed:', err);
+      });
     }
 
     // Always return success to avoid leaking user existence
@@ -322,7 +326,9 @@ authRoutes.post('/resend-verification', loginLimiter, validate(resendVerificatio
         },
       });
 
-      await sendVerificationEmail(email, verificationToken);
+      sendVerificationEmail(email, verificationToken).catch(err => {
+        console.error('[Auth:ResendVerification] Non-blocking email delivery failed:', err);
+      });
     }
 
     // Always return success to avoid leaking user existence
