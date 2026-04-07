@@ -25,8 +25,18 @@ const PORT = process.env.PORT || 4000;
 
 // ─── Security Middleware ───────────────────────────────────────────────────────
 app.use(helmet());
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:3000'];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
@@ -97,7 +107,26 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   });
 });
 
-// ─── Start Server ──────────────────────────────────────────────────────────────
+// ─── Environment Verification & Startup ──────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const requiredEnv = [
+    'FRONTEND_URL',
+    'DATABASE_URL',
+    'JWT_ACCESS_SECRET',
+    'JWT_REFRESH_SECRET',
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET'
+  ];
+  const missing = requiredEnv.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`\n❌ [DEATH KNELL] CRITICAL DEPLOYMENT BLOCKER`);
+    console.error(`Missing required production environment variables:`);
+    missing.forEach(m => console.error(`   - ${m}`));
+    console.error(`The server cannot safely boot in production state without these defined. Process exiting.\n`);
+    process.exit(1);
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`
   ┌──────────────────────────────────────────┐
