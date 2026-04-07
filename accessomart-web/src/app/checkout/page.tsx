@@ -577,8 +577,8 @@ function CheckoutContent() {
                        ) : (
                          <div className="space-y-6 pt-4 border-t border-surface-container-highest/10 animate-pulse">
                             <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl text-center space-y-2">
-                               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">PayPal Sandbox Enabled</p>
-                               <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.05em]">Order confirmation will occur in the final step.</p>
+                               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">PayPal Protocol Active</p>
+                               <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.05em]">Order confirmation will occur in the subsequent step.</p>
                             </div>
                          </div>
                        )}
