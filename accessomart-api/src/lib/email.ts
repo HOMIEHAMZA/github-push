@@ -17,15 +17,21 @@ const createTransporter = () => {
 
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for 587
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    connectionTimeout: 10000, // 10s
-    greetingTimeout: 5000,    // 5s
-    socketTimeout: 10000,     // 10s
+    // Make sure STARTTLS is properly handled for port 587:
+    requireTLS: process.env.SMTP_SECURE !== 'true',
+    // Network robustness for cloud providers like Render
+    connectionTimeout: 20000, // 20s
+    greetingTimeout: 15000,   // 15s
+    socketTimeout: 20000,     // 20s
+    // Detailed connection logging for diagnostics
+    debug: true,
+    logger: true,
   });
 };
 
