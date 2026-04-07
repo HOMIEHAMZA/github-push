@@ -133,6 +133,7 @@ async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
     sendOrderConfirmationEmail(order.user.email, orderNumber, {
       totalAmount: Number((order as any).total || 0),
       name: order.user.firstName,
+      items: order.items,
     }).catch(err => {
       console.error('[OrderFinalize] Failed to dispatch order confirmation email:', err);
     });

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, Truck, Zap, CheckCircle2, MapPin, ChevronDown } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
+import { useCartStore, CartItem } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAddressStore } from '@/store/useAddressStore';
 import { ordersApi } from '@/lib/api-client';
@@ -63,6 +63,8 @@ function CheckoutContent() {
   const [showSavedAddresses, setShowSavedAddresses] = useState(false);
   const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYPAL'>('STRIPE');
   const [internalOrderId, setInternalOrderId] = useState<string | null>(null);
+  const [purchasedItems, setPurchasedItems] = useState<CartItem[]>([]);
+  const [successMetrics, setSuccessMetrics] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 });
   
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -157,6 +159,8 @@ function CheckoutContent() {
 
           await ordersApi.confirmPayment(res.order.id);
 
+          setPurchasedItems([...items]);
+          setSuccessMetrics({ subtotal, tax, shipping, total });
           setOrderNumber(res.order.orderNumber);
           clearCart();
           setStep('success');
@@ -208,6 +212,8 @@ function CheckoutContent() {
       
       await ordersApi.confirmPaypalPayment(internalOrderId, paypalOrderId);
       
+      setPurchasedItems([...items]);
+      setSuccessMetrics({ subtotal, tax, shipping, total });
       clearCart();
       setStep('success');
     } catch (err: unknown) {
@@ -237,12 +243,52 @@ function CheckoutContent() {
             <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="text-primary" size={48} />
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 w-full">
                 <h1 className="text-4xl font-display font-bold text-on-surface">CALIBRATION COMPLETE</h1>
-                <p className="text-on-surface-variant leading-relaxed uppercase text-xs tracking-widest font-bold">
+                <p className="text-on-surface-variant leading-relaxed uppercase text-xs tracking-widest font-bold mb-6">
                     Order #{orderNumber || 'ACC-8023-99X'}
                 </p>
-                <p className="text-on-surface-variant leading-relaxed">
+                
+                <div className="bg-black/30 border border-white/10 rounded-xl p-4 mb-6 text-left w-full h-[250px] overflow-y-auto">
+                    <h3 className="text-xs uppercase tracking-widest text-primary mb-3 font-bold">Encrypted Manifest</h3>
+                    <div className="space-y-3">
+                        {purchasedItems.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-start text-sm border-b border-white/5 pb-2">
+                                <div>
+                                    <p className="font-bold text-white uppercase">{item.name}</p>
+                                    <p className="text-xs text-zinc-500 uppercase tracking-tighter">
+                                      {item.color || item.model || item.size ? [item.color, item.model, item.size].filter(Boolean).join(' • ') : 'Standard Configuration'}
+                                    </p>
+                                    <p className="text-[10px] text-zinc-600 mt-1">QTY: {item.quantity}</p>
+                                </div>
+                                <p className="font-machine text-primary font-bold">${Number(item.price * item.quantity).toFixed(2)}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-left border border-white/5 p-4 rounded-xl bg-surface-container-highest/10">
+                    <div>
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none mb-1">Financial Summary</p>
+                      <div className="text-xs text-zinc-400 space-y-1">
+                        <div className="flex justify-between"><span>Subtotal:</span> <span>${successMetrics.subtotal.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Tax:</span> <span>${successMetrics.tax.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Shipping:</span> <span>${successMetrics.shipping.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-white font-bold mt-1 pt-1 border-t border-white/10">
+                           <span>Total:</span> <span className="text-primary">${successMetrics.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none mb-1">Payment Status</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <ShieldCheck className="text-emerald-500 w-4 h-4" />
+                        <span className="text-xs font-bold text-white uppercase tracking-tighter">Authorized ({paymentProvider})</span>
+                      </div>
+                    </div>
+                </div>
+
+                <p className="text-on-surface-variant leading-relaxed text-sm">
                     Your deployment has been initiated. A detailed transmission packet (receipt) has been sent to your primary terminal.
                 </p>
             </div>

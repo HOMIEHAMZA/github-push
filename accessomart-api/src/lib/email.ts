@@ -115,24 +115,52 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
 /**
  * Ships an order confirmation receipt after payment clears
  */
-export const sendOrderConfirmationEmail = async (email: string, orderNumber: string, metadata: { totalAmount: number; name: string }) => {
+export const sendOrderConfirmationEmail = async (email: string, orderNumber: string, metadata: { totalAmount: number; name: string; items: any[] }) => {
   const orderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders/${orderNumber}`;
   
+  const itemsHtml = metadata.items.map(item => `
+    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+      <div>
+        <p style="margin: 0; font-weight: bold; color: #1f2937;">${item.productName}</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Variant: ${item.variantName}</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Qty: ${item.quantity}</p>
+      </div>
+      <div style="text-align: right;">
+        <p style="margin: 0; font-weight: bold; color: #1f2937;">$${Number(item.totalPrice).toFixed(2)}</p>
+      </div>
+    </div>
+  `).join('');
+
   const html = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
       <h2 style="color: #6366f1;">Order Confirmation</h2>
       <p>Hi ${metadata.name},</p>
       <p>Thank you for choosing Accessomart! We've successfully received and secured your order.</p>
+      
       <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 24px 0;">
-        <p style="margin: 0; font-weight: bold;">Order Number: <span style="font-family: monospace;">${orderNumber}</span></p>
-        <p style="margin: 8px 0 0 0;">Total Captured: $${metadata.totalAmount.toFixed(2)}</p>
+        <p style="margin: 0; font-weight: bold; font-size: 18px;">Order Number: <span style="font-family: monospace;">${orderNumber}</span></p>
       </div>
+      
+      <div style="margin: 24px 0;">
+        <h3 style="margin-bottom: 12px; color: #374151; font-size: 16px;">Purchased Items</h3>
+        <div style="border-top: 1px solid #e5e7eb;">
+          ${itemsHtml}
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 16px; margin-top: 8px; font-weight: bold; font-size: 18px;">
+          <span>Total Captured:</span>
+          <span>$${metadata.totalAmount.toFixed(2)}</span>
+        </div>
+      </div>
+
       <p>Our autonomous logistics team is preparing your hardware for shipment. You can track your order status in real-time below:</p>
       <div style="margin: 32px 0;">
         <a href="${orderUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Order Status</a>
       </div>
-      <p>We'll notify you as soon as tracking coordinates are assigned.</p>
-      <p>Best regards,<br>The Accessomart Protocol Team</p>
+      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280;">
+        <p>If you need assistance with your deployment, please visit our <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/support" style="color: #6366f1;">Support Nexus</a> or reply directly to this transmission.</p>
+        <p>We'll notify you as soon as tracking coordinates are assigned.</p>
+      </div>
+      <p style="margin-top: 24px;">Best regards,<br>The Accessomart Protocol Team</p>
     </div>
   `;
 

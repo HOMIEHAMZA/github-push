@@ -5,7 +5,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { adminApi } from '@/lib/api-client';
 import { ApiOrder, OrderStatus } from '@/lib/api-types';
 import { useToastStore } from '@/store/useToastStore';
-import { LucideIcon, ShoppingBag, ExternalLink, CheckCircle2, Clock, Truck, XCircle, PackageCheck, Loader2, RefreshCcw } from 'lucide-react';
+import { LucideIcon, ShoppingBag, ExternalLink, CheckCircle2, Clock, Truck, XCircle, PackageCheck, Loader2, RefreshCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig: Record<OrderStatus, { icon: LucideIcon, color: string, bg: string, label: string }> = {
@@ -32,6 +32,16 @@ export default function OrderManager() {
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
+  const toggleOrderExpand = (id: string) => {
+    setExpandedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const fetchOrders = React.useCallback(async () => {
     try {
@@ -163,14 +173,71 @@ export default function OrderManager() {
                     </div>
 
                     <button
-                      onClick={() => addToast(`Order details for ${order.orderNumber || order.id} coming in next transmission`, 'info')}
+                      onClick={() => toggleOrderExpand(order.id)}
                       className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
                       aria-label="View order details"
                     >
-                      <ExternalLink size={18} />
+                      {expandedOrders.has(order.id) ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
                 </div>
+
+                {/* Expanded Items Accordion */}
+                {expandedOrders.has(order.id) && (
+                  <div className="mt-6 pt-6 border-t border-white/10 animate-in fade-in slide-in-from-top-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      <div className="lg:col-span-2 space-y-4">
+                        <h4 className="text-xs uppercase tracking-widest text-primary mb-2 font-bold">Purchase Manifest</h4>
+                        <div className="space-y-4">
+                          {order.items?.map((item) => (
+                            <div key={item.id} className="flex items-center space-x-4 bg-black/20 p-4 rounded-xl border border-white/5">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-white uppercase truncate">{item.productName}</p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-xs text-zinc-400 font-medium bg-white/5 px-2 py-0.5 rounded-md">
+                                    {item.variantName}
+                                  </span>
+                                  <span className="text-xs text-zinc-500 font-bold tracking-tight">
+                                    QTY: {item.quantity}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#00f2ff]">${Number(item.totalPrice).toFixed(2)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="text-xs uppercase tracking-widest text-primary mb-3 font-bold">Customer Profile</h4>
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-2">
+                            <p className="text-sm text-white font-bold">{getCustomerName(order)}</p>
+                            <p className="text-xs text-zinc-400">{order.user?.email || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs uppercase tracking-widest text-primary mb-3 font-bold">Shipping Coordinates</h4>
+                          <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-2">
+                            {order.address ? (
+                              <>
+                                <p className="text-sm text-white font-bold">{order.address.firstName} {order.address.lastName}</p>
+                                <p className="text-xs text-zinc-400">{order.address.line1}{order.address.line2 ? `, ${order.address.line2}` : ''}</p>
+                                <p className="text-xs text-zinc-400">{order.address.city}, {order.address.state || ''} {order.address.postalCode}</p>
+                                <p className="text-xs text-zinc-400">{order.address.country}</p>
+                              </>
+                            ) : (
+                              <p className="text-xs text-zinc-500 italic">No logistics data attached to this transmission.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
