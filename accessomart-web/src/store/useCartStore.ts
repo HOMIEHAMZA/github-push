@@ -17,6 +17,10 @@ export interface CartItem {
   color?: string | null;
   size?: string | null;
   model?: string | null;
+  inventory?: {
+    quantity: number;
+    reservedQty: number;
+  };
 }
 
 interface CartState {
@@ -55,6 +59,10 @@ export const useCartStore = create<CartState>((set, get) => ({
         color: apiItem.variant.color,
         size: apiItem.variant.size,
         model: apiItem.variant.model,
+        inventory: apiItem.variant.inventory ? {
+          quantity: apiItem.variant.inventory.quantity,
+          reservedQty: apiItem.variant.inventory.reservedQty,
+        } : undefined,
       }));
       set({ items: mappedItems, isLoading: false });
     } catch (error) {

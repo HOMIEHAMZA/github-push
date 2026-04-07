@@ -31,9 +31,19 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
   );
   const [isAdding, setIsAdding] = useState(false);
 
-  const stockStatus = selectedVariant?.inventory && selectedVariant.inventory.quantity > 10 
+  const availableStock = selectedVariant?.inventory ? (selectedVariant.inventory.quantity - selectedVariant.inventory.reservedQty) : 0;
+
+  React.useEffect(() => {
+    if (quantity > availableStock && availableStock > 0) {
+      setQuantity(availableStock);
+    } else if (availableStock === 0 && quantity > 1) {
+      setQuantity(1); // Button disabled, keep UI clean
+    }
+  }, [availableStock, quantity]);
+
+  const stockStatus = selectedVariant?.inventory && availableStock > 10 
     ? 'IN_STOCK' 
-    : selectedVariant?.inventory && selectedVariant.inventory.quantity > 0 
+    : selectedVariant?.inventory && availableStock > 0 
       ? 'LIMITED_STOCK' 
       : 'OUT_OF_STOCK';
 
@@ -280,8 +290,9 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
             <button 
               type="button"
               title="Increase quantity"
-              onClick={() => setQuantity(quantity + 1)}
-              className="px-4 py-2 hover:bg-surface-container-highest/20 text-on-surface-variant transition-colors"
+              disabled={quantity >= availableStock}
+              onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
+              className="px-4 py-2 hover:bg-surface-container-highest/20 text-on-surface-variant transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             > + </button>
           </div>
           
@@ -305,7 +316,7 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
 
         <PrimaryButton 
           className="w-full bg-primary py-6 text-base tracking-[0.25em] h-auto shadow-[0_0_30px_rgba(143,245,255,0.15)]"
-          disabled={stockStatus === 'OUT_OF_STOCK' || isAdding}
+          disabled={stockStatus === 'OUT_OF_STOCK' || isAdding || quantity > availableStock}
           title="Add to cart"
           onClick={async () => {
             setIsAdding(true);

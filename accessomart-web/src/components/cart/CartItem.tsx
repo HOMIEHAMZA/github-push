@@ -36,6 +36,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
   const displayImage = isCustomBuild ? "/images/components/case.png" : imageUrl;
 
   const isDrawer = variant === 'drawer';
+  const availableStock = item.inventory ? (item.inventory.quantity - item.inventory.reservedQty) : 0;
 
   return (
     <div className={cn(
@@ -83,7 +84,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
               </div>
             ) : isCustomBuild && buildComponents && (
               <p className="text-[10px] text-cyan-400/60 mt-1 line-clamp-1 italic">
-                {(buildComponents as any[]).length} Performance Modules
+                {(buildComponents as unknown[]).length} Performance Modules
               </p>
             )}
           </div>
@@ -112,9 +113,10 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
               {quantity}
             </span>
             <button
-              onClick={() => updateQuantity(id, quantity + 1)}
+              onClick={() => updateQuantity(id, Math.min(availableStock, quantity + 1))}
               title="Increase quantity"
-              className="p-1 rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors"
+              className="p-1 rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={quantity >= availableStock}
             >
               <Plus size={isDrawer ? 14 : 16} />
             </button>
