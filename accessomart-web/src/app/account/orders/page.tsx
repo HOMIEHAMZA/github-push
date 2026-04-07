@@ -13,11 +13,15 @@ import {
   Truck,
   XCircle,
   AlertCircle,
-  RefreshCcw
+  RefreshCcw,
+  Copy
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { useToastStore } from '@/store/useToastStore';
 
 export default function OrdersPage() {
+  const { addToast } = useToastStore();
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,9 +146,9 @@ export default function OrdersPage() {
                 <div className="flex flex-col gap-6">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-center space-x-4">
-                      <div className="w-16 h-16 rounded-xl bg-[#222] border border-white/5 shrink-0 flex items-center justify-center p-2 overflow-hidden">
+                      <div className="w-16 h-16 rounded-xl bg-[#222] border border-white/5 shrink-0 flex items-center justify-center p-2 overflow-hidden relative">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.productName} className="w-full h-full object-contain" />
+                          <Image src={item.imageUrl} alt={item.productName} fill className="object-contain p-2" />
                         ) : (
                           <Package className="w-6 h-6 text-white/10" />
                         )}
@@ -170,10 +174,31 @@ export default function OrdersPage() {
                 {/* Tracking & Actions */}
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-white/5">
                   <div className="flex items-center space-x-2 px-4 py-2 bg-[#1a1a1a] rounded-lg border border-white/5">
-                    <Truck className="w-4 h-4 text-[#00f2ff]" />
-                    <span className="text-xs font-medium text-white/60">
-                      {order.trackingNumber ? `Tracking: ${order.trackingNumber}` : 'Preparing for shipment'}
-                    </span>
+                    {order.trackingNumber ? (
+                      <>
+                        <Truck className="w-4 h-4 text-[#00f2ff]" />
+                        <span className="text-xs font-medium text-white/60">
+                          Tracking: <span className="text-[#00f2ff] font-mono tracking-wider">{order.trackingNumber}</span>
+                        </span>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(order.trackingNumber!);
+                            addToast('Tracking number copied to clipboard', 'info');
+                          }}
+                          className="ml-2 p-1 hover:bg-white/10 rounded-md transition-colors"
+                          title="Copy tracking number"
+                        >
+                          <Copy className="w-3 h-3 text-white/40 hover:text-white" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="text-xs font-medium text-amber-500/80">
+                          Preparing for shipment
+                        </span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center space-x-3 text-xs font-bold uppercase tracking-widest">
                     <button className="px-5 py-2 bg-[#00f2ff] text-black rounded-lg hover:bg-white transition-colors">

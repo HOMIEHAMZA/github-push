@@ -7,7 +7,6 @@ import {
   Heart, 
   Trash2, 
   ShoppingCart, 
-  Search, 
   ArrowRight,
   Package,
   Star
@@ -34,7 +33,7 @@ export default function WishlistPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-[#7000ff]">
+        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-[#7000ff]">
           My Wishlist
         </h1>
         <p className="mt-2 text-white/40">
@@ -59,12 +58,13 @@ export default function WishlistPage() {
               <div key={item.id} className="group relative bg-[#111] border border-white/5 rounded-2xl overflow-hidden hover:border-[#00f2ff]/30 transition-all duration-500">
                 <div className="flex p-4 gap-4">
                   {/* Image Container */}
-                  <div className="relative w-32 h-32 rounded-xl bg-[#0a0a0a] border border-white/5 flex-shrink-0 overflow-hidden group-hover:border-[#00f2ff]/20 transition-colors">
+                  <div className="relative w-32 h-32 rounded-xl bg-[#0a0a0a] border border-white/5 shrink-0 overflow-hidden group-hover:border-[#00f2ff]/20 transition-colors">
                     {primaryImage ? (
-                      <img 
+                      <Image 
                         src={primaryImage.url} 
                         alt={product.name} 
-                        className="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform duration-500" 
+                        fill
+                        className="object-contain p-2 group-hover:scale-110 transition-transform duration-500" 
                       />
                     ) : (
                       <Package className="w-8 h-8 text-white/10 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
@@ -81,6 +81,8 @@ export default function WishlistPage() {
                          <button 
                            onClick={() => toggleWishlist(product.id)}
                            className="text-white/20 hover:text-red-400 transition-colors"
+                           title="Remove from wishlist"
+                           aria-label="Remove from wishlist"
                          >
                            <Trash2 className="w-4 h-4" />
                          </button>
@@ -128,7 +130,7 @@ export default function WishlistPage() {
           </p>
           <Link 
             href="/products" 
-            className="mt-8 flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-bold rounded-xl hover:shadow-[0_0_20px_rgba(0,242,255,0.3)] transition-all"
+            className="mt-8 flex items-center space-x-2 px-8 py-3 bg-linear-to-r from-[#00f2ff] to-[#7000ff] text-black font-bold rounded-xl hover:shadow-[0_0_20px_rgba(0,242,255,0.3)] transition-all"
           >
             <span>Explore Catalog</span>
             <ArrowRight className="w-4 h-4" />
