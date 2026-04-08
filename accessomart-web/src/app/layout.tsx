@@ -21,6 +21,9 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Accessomart | Premium Electronics & Gaming",
   description: "The digital curator for elite electronics and gaming gear.",
+   verification: {
+    google: "AHU4OaTJ9YWPB_5Xp_WjTHRMZmSTBHCLvojeTLlDy6c"
+  }
 };
 
 export default function RootLayout({
