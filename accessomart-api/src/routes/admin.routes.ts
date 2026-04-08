@@ -369,24 +369,54 @@ adminRoutes.post('/products', async (req, res) => {
     const bodyCleaned = { ...body };
     if (bodyCleaned.brandId === '') bodyCleaned.brandId = undefined;
     if (bodyCleaned.categoryId === '') bodyCleaned.categoryId = undefined;
+    if (bodyCleaned.variants === '' || (Array.isArray(bodyCleaned.variants) && bodyCleaned.variants.length === 0)) {
+      bodyCleaned.variants = undefined;
+    }
+    if (bodyCleaned.specs === '' || (Array.isArray(bodyCleaned.specs) && bodyCleaned.specs.length === 0)) {
+      bodyCleaned.specs = undefined;
+    }
     // Strip client-sent images array — images are managed separately via upload endpoints
     delete bodyCleaned.images;
 
     const data = productCreateSchema.parse(bodyCleaned);
     const slug = data.slug || bodyCleaned.slug || body.name.toLowerCase().replace(/\s+/g, '-');
 
-    // Create product + default variant + inventory in one transaction so the
-    // product appears in inventory immediately without manual intervention.
+    // Create product + variants + inventory in one transaction
     const product = await prisma.$transaction(async (tx) => {
-      const { specs, ...rest } = data;
+      const { specs, variants, ...rest } = data;
+      
       const created = await tx.product.create({
         data: {
           ...rest,
           slug,
           status: data.status || 'DRAFT',
           specs: specs && specs.length > 0 ? {
-            create: specs
+            create: specs.map(s => ({
+              groupName: s.groupName,
+              specKey: s.specKey,
+              specValue: s.specValue,
+              sortOrder: s.sortOrder
+            }))
           } : undefined,
+          variants: variants && variants.length > 0 ? {
+            create: variants.map(v => ({
+              sku: v.sku.trim(),
+              name: v.name || data.name,
+              price: v.price,
+              comparePrice: v.comparePrice,
+              color: v.color,
+              size: v.size,
+              model: v.model,
+              isDefault: v.isDefault,
+              isActive: v.isActive,
+              inventory: {
+                create: {
+                  quantity: 0,
+                  lowStockThreshold: 5
+                }
+              }
+            }))
+          } : undefined
         } as any,
         include: {
           brand: true,
@@ -397,28 +427,30 @@ adminRoutes.post('/products', async (req, res) => {
         },
       });
 
-      // Auto-create a default "Standard" variant so inventory tracking works
-      // immediately. SKU format: slug-default (truncated to stay unique)
-      const skuBase = slug.replace(/[^a-z0-9-]/g, '').substring(0, 40);
-      const defaultVariant = await tx.productVariant.create({
-        data: {
-          productId: created.id,
-          sku: `${skuBase}-default`,
-          name: 'Standard',
-          price: data.basePrice,
-          isActive: true,
-          isDefault: true,
-        },
-      });
+      // Auto-create a default "Standard" variant ONLY if no variants were provided
+      // SKU format: slug-default (truncated to stay unique)
+      if (!variants || variants.length === 0) {
+        const skuBase = slug.replace(/[^a-z0-9-]/g, '').substring(0, 40);
+        const defaultVariant = await tx.productVariant.create({
+          data: {
+            productId: created.id,
+            sku: `${skuBase}-default`,
+            name: 'Standard',
+            price: data.basePrice,
+            isActive: true,
+            isDefault: true,
+          },
+        });
 
-      // Create the inventory record for the default variant
-      await tx.inventory.create({
-        data: {
-          variantId: defaultVariant.id,
-          quantity: 0,
-          lowStockThreshold: 5,
-        },
-      });
+        // Create the inventory record for the default variant
+        await tx.inventory.create({
+          data: {
+            variantId: defaultVariant.id,
+            quantity: 0,
+            lowStockThreshold: 5,
+          },
+        });
+      }
 
       return created;
     });
