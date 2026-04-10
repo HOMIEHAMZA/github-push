@@ -141,7 +141,11 @@ adminRoutes.put('/settings/:key', validate(adminSettingSchema), async (req: any,
 adminRoutes.get('/orders', async (req, res) => {
   const { status, page = '1', limit = '20' } = req.query;
   const where: any = {};
-  if (status) where.status = status;
+  if (status) {
+    where.status = status;
+  } else {
+    where.status = { not: 'PENDING' };
+  }
 
   const [orders, total] = await prisma.$transaction([
     prisma.order.findMany({

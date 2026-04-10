@@ -501,12 +501,13 @@ function CheckoutContent() {
                 </motion.div>
               )}
 
-              {step === 'payment' && (
+              </div>
+
+              <div className={step === 'payment' ? 'block' : 'hidden'}>
                 <motion.div
                   key="payment"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
                   className="space-y-8 pb-12"
                 >
                   <div className="space-y-6">
@@ -600,7 +601,9 @@ function CheckoutContent() {
                     </button>
                   </div>
                 </motion.div>
-              )}
+              </div>
+
+              <div style={{ display: 'none' }}>
 
               {step === 'review' && (
                 <motion.div

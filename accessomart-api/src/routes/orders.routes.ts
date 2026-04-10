@@ -143,7 +143,10 @@ async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
 // ─── GET /api/v1/orders ───────────────────────────────────────────────────────
 orderRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
   const orders = await prisma.order.findMany({
-    where: { userId: req.userId },
+    where: { 
+      userId: req.userId,
+      status: { not: 'PENDING' }
+    },
     include: {
       items: {
         include: { variant: { include: { product: true } } },
