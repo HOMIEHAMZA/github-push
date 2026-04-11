@@ -66,6 +66,7 @@ function CheckoutContent() {
   const [showSavedAddresses, setShowSavedAddresses] = useState(false);
   const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYPAL'>('STRIPE');
   const [internalOrderId, setInternalOrderId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [purchasedItems, setPurchasedItems] = useState<CartItem[]>([]);
   const [successMetrics, setSuccessMetrics] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 });
   
@@ -120,27 +121,39 @@ function CheckoutContent() {
         if (!stripe || !elements) return;
         try {
           setLoading(true);
-          const res = await ordersApi.checkout({
-            addressData: {
-              firstName: formData.firstName,
-              lastName: formData.lastName,
-              email: formData.email,
-              address: formData.address,
-              city: formData.city,
-              postalCode: formData.postalCode,
-              country: formData.country,
-            },
-            paymentProvider: 'STRIPE',
-          });
 
-          if (!res.clientSecret || !res.order?.id) {
-              throw new Error('Failed to initialize secure connection with payment provider.');
+          let currentSecret = clientSecret;
+          let currentOrderId = internalOrderId;
+
+          if (!currentSecret || !currentOrderId) {
+            const res = await ordersApi.checkout({
+              addressData: {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                email: formData.email,
+                address: formData.address,
+                city: formData.city,
+                postalCode: formData.postalCode,
+                country: formData.country,
+              },
+              paymentProvider: 'STRIPE',
+            });
+
+            if (!res.clientSecret || !res.order?.id) {
+                throw new Error('Failed to initialize secure connection with payment provider.');
+            }
+            
+            currentSecret = res.clientSecret;
+            currentOrderId = res.order.id;
+            setClientSecret(currentSecret);
+            setInternalOrderId(currentOrderId);
+            setOrderNumber(res.order.orderNumber);
           }
 
           const cardElement = elements.getElement(CardNumberElement);
           if (!cardElement) throw new Error('Card Element disconnected.');
 
-          const confirmRes = await stripe.confirmCardPayment(res.clientSecret, {
+          const confirmRes = await stripe.confirmCardPayment(currentSecret, {
               payment_method: {
                   card: cardElement,
                   billing_details: {
@@ -160,11 +173,10 @@ function CheckoutContent() {
               throw new Error(confirmRes.error.message || 'Payment verification failed.');
           }
 
-          await ordersApi.confirmPayment(res.order.id);
+          await ordersApi.confirmPayment(currentOrderId);
 
           setPurchasedItems([...items]);
           setSuccessMetrics({ subtotal, tax, shipping, total });
-          setOrderNumber(res.order.orderNumber);
           clearCart();
           setStep('success');
         } catch (err: unknown) {
@@ -229,8 +241,15 @@ function CheckoutContent() {
   };
 
   const prevStep = () => {
-    if (step === 'payment') setStep('shipping');
-    else if (step === 'review') setStep('payment');
+    if (step === 'payment') {
+      setStep('shipping');
+      setClientSecret(null);
+      setInternalOrderId(null);
+    } else if (step === 'review') {
+      setStep('payment');
+      setClientSecret(null);
+      setInternalOrderId(null);
+    }
   };
 
   if (!mounted) return null;
@@ -499,11 +518,11 @@ function CheckoutContent() {
                     <ArrowRight size={18} />
                   </button>
                 </motion.div>
-              )}
+               )}
+               {/* The payment step is placed outside AnimatePresence so it never unmounts, avoiding CardElement disconnects */}
+               </AnimatePresence>
 
-              </div>
-
-              <div className={step === 'payment' ? 'block' : 'hidden'}>
+              <div style={{ display: step === 'payment' ? 'block' : 'none' }}>
                 <motion.div
                   key="payment"
                   initial={{ opacity: 0, x: -20 }}
@@ -603,8 +622,7 @@ function CheckoutContent() {
                 </motion.div>
               </div>
 
-              <div style={{ display: 'none' }}>
-
+              <AnimatePresence mode="wait">
               {step === 'review' && (
                 <motion.div
                   key="review"
