@@ -7,11 +7,12 @@ interface PromoBannerProps {
   subtitle: string;
   description: string;
   ctaText: string;
+  ctaHref?: string;
   imageUrl: string;
   reverse?: boolean;
 }
 
-export function PromoBanner({ title, subtitle, description, ctaText, imageUrl, reverse = false }: PromoBannerProps) {
+export function PromoBanner({ title, subtitle, description, ctaText, ctaHref, imageUrl, reverse = false }: PromoBannerProps) {
   return (
     <section className="py-24 bg-surface px-6">
       <div className={`container mx-auto rounded-3xl overflow-hidden bg-surface-container-highest relative ${reverse ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -27,7 +28,7 @@ export function PromoBanner({ title, subtitle, description, ctaText, imageUrl, r
             <p className="text-on-surface-variant font-sans text-lg mb-12 max-w-md leading-relaxed">
               {description}
             </p>
-            <PrimaryButton>{ctaText}</PrimaryButton>
+            <PrimaryButton href={ctaHref}>{ctaText}</PrimaryButton>
           </div>
           
           <div className={`relative h-full min-h-[400px] overflow-hidden ${reverse ? 'lg:order-1' : ''}`}>

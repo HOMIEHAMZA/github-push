@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 export function GlassNavbar() {
   const { getTotalItems, openDrawer } = useCartStore();
   const { pcBuilderSettings } = useAdminStore();
-  const { isGuest, isAuthenticated, logout } = useAuthStore();
+  const { user, isGuest, isAuthenticated, logout } = useAuthStore();
   const itemCount = getTotalItems();
   const [mounted, setMounted] = useState(false);
 
@@ -41,7 +41,9 @@ export function GlassNavbar() {
           {pcBuilderSettings.showInNav && (
             <Link href="/pc-builder" className="text-sm font-semibold tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">Builder</Link>
           )}
-          <Link href="/admin" className="text-sm font-semibold tracking-widest uppercase text-tertiary hover:text-primary transition-colors">Admin</Link>
+          {user?.role === 'ADMIN' && (
+            <Link href="/admin" className="text-sm font-semibold tracking-widest uppercase text-tertiary hover:text-primary transition-colors">Admin</Link>
+          )}
         </div>
         
         {/* Utility / Cart */}

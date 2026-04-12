@@ -2,7 +2,8 @@ export const heroData = {
   title: "REDEFINE PERFORMANCE.",
   subtitle: "Elite Gear for the Digital Frontier",
   description: "Experience the next evolution of gaming and professional electronics with the curated Obsidian Circuit collection. Built for those who demand precision, speed, and uncompromising quality.",
-  ctaText: "Explore Collection",
+  ctaText: "Access Gear",
+  ctaHref: "/products",
   secondaryCtaText: "Virtual Tour",
   imageUrl: "/images/monitor.png",
   badge: "New Release: Vanguard Series"
@@ -43,6 +44,7 @@ export const promoData = {
   subtitle: "Limited Edition Release",
   description: "Hand-crafted electronics featuring the signature Obsidian matte finish and integrated high-performance cooling systems. Defined by shadows, built for light.",
   ctaText: "Join the Loop",
+  ctaHref: "#newsletter",
   imageUrl: "/images/monitor.png",
   reverse: true
 };

@@ -170,3 +170,57 @@ export const sendOrderConfirmationEmail = async (email: string, orderNumber: str
     html,
   });
 };
+
+/**
+ * Ships a support inquiry notification to the admin and a confirmation to the sender
+ */
+export const sendSupportInquiryEmail = async (data: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}) => {
+  // 1. Notify Admin
+  const adminHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+      <h2 style="color: #6366f1;">New Support Inquiry</h2>
+      <p>A new message has been received via the Accessomart Support Nexus.</p>
+      
+      <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 24px 0;">
+        <p style="margin: 0 0 12px 0;"><strong>From:</strong> ${data.name} (&lt;${data.email}&gt;)</p>
+        <p style="margin: 0 0 12px 0;"><strong>Subject:</strong> ${data.subject}</p>
+        <p style="margin: 0;"><strong>Message:</strong></p>
+        <p style="white-space: pre-wrap; margin-top: 8px; color: #374151;">${data.message}</p>
+      </div>
+      
+      <p style="font-size: 14px; color: #6b7280;">Reply directly to this email to communicate with the customer.</p>
+    </div>
+  `;
+
+  await sendMail({
+    to: process.env.SUPPORT_EMAIL || 'support@accessomart.com',
+    subject: `[SUPPORT INQUIRY] ${data.subject}`,
+    replyTo: data.email,
+    html: adminHtml,
+  });
+
+  // 2. Automated Confirmation to User
+  const userHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+      <h2 style="color: #6366f1;">Transmission Received</h2>
+      <p>Hi ${data.name},</p>
+      <p>Your support inquiry regarding <strong>"${data.subject}"</strong> has been successfully received by our specialists.</p>
+      <p>We are currently analyzing your request and will respond within our target latency of 12-24 hours.</p>
+      
+      <div style="border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 16px; font-size: 14px; color: #6b7280;">
+        <p>Best regards,<br>The Accessomart Support Team</p>
+      </div>
+    </div>
+  `;
+
+  await sendMail({
+    to: data.email,
+    subject: 'Accessomart - Support Inquiry Received',
+    html: userHtml,
+  });
+};

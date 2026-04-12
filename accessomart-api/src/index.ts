@@ -18,6 +18,7 @@ import { builderRoutes } from './routes/builder.routes';
 // import { reviewRoutes } from './routes/reviews.routes';
 import { wishlistRoutes } from './routes/wishlist.routes';
 import { addressRoutes } from './routes/addresses.routes';
+import { supportRoutes } from './routes/support.routes';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -82,6 +83,7 @@ app.use(`${API}/builder`, apiLimiter, builderRoutes);
 // app.use(`${API}/reviews`, apiLimiter, reviewRoutes);
 app.use(`${API}/wishlist`, apiLimiter, wishlistRoutes);
 app.use(`${API}/addresses`, apiLimiter, addressRoutes);
+app.use(`${API}/support`, apiLimiter, supportRoutes);
 
 // ─── 404 Fallback ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {

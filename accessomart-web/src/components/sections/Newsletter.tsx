@@ -17,7 +17,7 @@ export function Newsletter() {
   };
 
   return (
-    <section className="py-24 bg-surface-container-lowest">
+    <section id="newsletter" className="py-24 bg-surface-container-lowest">
       <div className="container mx-auto px-6">
         <div className="relative rounded-3xl overflow-hidden bg-surface-container-highest p-12 lg:p-20 text-center border border-primary/5 shadow-2xl">
           {/* Subtle Glow inside the card */}

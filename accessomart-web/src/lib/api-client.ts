@@ -523,3 +523,15 @@ export const wishlistApi = {
 export const categoriesApi = {
   list: () => apiFetch<{ categories: ApiCategory[] }>('/categories'),
 };
+
+// =============================================================================
+// SUPPORT API
+// =============================================================================
+
+export const supportApi = {
+  contact: (data: { name: string; email: string; subject: string; message: string }) =>
+    apiFetch<{ success: boolean; message: string }>('/support/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
