@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { ShieldCheck, Truck, Headset } from 'lucide-react';
 import Link from 'next/link';
 
 export function Footer() {
@@ -18,18 +19,19 @@ export function Footer() {
           </p>
         </div>
 
-        {/* Links 1 */}
+        {/* Links 1 - Catalog */}
         <div className="flex flex-col space-y-4">
-          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide">Catalog</h4>
+          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide font-bold uppercase text-xs tracking-[0.2em] text-primary">Catalog</h4>
           <Link href="/products" className="text-on-surface-variant hover:text-primary transition-colors text-sm">New Arrivals</Link>
           <Link href="/products?category=gaming" className="text-on-surface-variant hover:text-primary transition-colors text-sm">Gaming Gear</Link>
           <Link href="/pc-builder" className="text-on-surface-variant hover:text-primary transition-colors text-sm">Custom PC Builder</Link>
           <Link href="/products?featured=true" className="text-on-surface-variant hover:text-primary transition-colors text-sm">Legendary Tier</Link>
         </div>
 
-        {/* Links 2 */}
+        {/* Links 2 - Support */}
         <div className="flex flex-col space-y-4">
-          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide">Support</h4>
+          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide font-bold uppercase text-xs tracking-[0.2em] text-primary">Support</h4>
+          <Link href="/about" className="text-on-surface-variant hover:text-primary transition-colors text-sm font-bold">About Us</Link>
           <Link href="/account/orders" className="text-on-surface-variant hover:text-primary transition-colors text-sm">Order Status</Link>
           <Link href="/support/returns" className="text-on-surface-variant hover:text-primary transition-colors text-sm">Returns & Exchanges</Link>
           <Link href="/support/faq" className="text-on-surface-variant hover:text-primary transition-colors text-sm">FAQ</Link>
@@ -38,7 +40,7 @@ export function Footer() {
 
         {/* Newsletter */}
         <div className="flex flex-col space-y-4">
-          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide">The Obsidian Circuit</h4>
+          <h4 className="font-display text-on-surface text-lg font-medium mb-2 tracking-wide font-bold uppercase text-xs tracking-[0.2em] text-primary">The Obsidian Circuit</h4>
           <p className="text-on-surface-variant text-sm mb-4">
             Join our newsletter for early access to legendary drops and exclusive gear.
           </p>
@@ -69,13 +71,46 @@ export function Footer() {
           )}
         </div>
       </div>
+
+      {/* Trust Block Row */}
+      <div className="max-w-7xl mx-auto px-8 mt-16 py-8 border-y border-surface-container/30 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="flex items-center gap-4 group">
+          <div className="p-3 bg-surface-container rounded-xl text-primary group-hover:scale-110 transition-transform duration-500">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <h5 className="text-[10px] font-bold text-on-surface uppercase tracking-widest mb-1">Secure Assets</h5>
+            <p className="text-[10px] text-on-surface-variant tracking-wider">SSL Secure & Protected Payments</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4 group">
+          <div className="p-3 bg-surface-container rounded-xl text-primary group-hover:scale-110 transition-transform duration-500">
+            <Truck size={24} />
+          </div>
+          <div>
+            <h5 className="text-[10px] font-bold text-on-surface uppercase tracking-widest mb-1">Rapid Logistics</h5>
+            <p className="text-[10px] text-on-surface-variant tracking-wider">Global Shipping & Carrier Tracking</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 group">
+          <div className="p-3 bg-surface-container rounded-xl text-primary group-hover:scale-110 transition-transform duration-500">
+            <Headset size={24} />
+          </div>
+          <div>
+            <h5 className="text-[10px] font-bold text-on-surface uppercase tracking-widest mb-1">Unified Support</h5>
+            <p className="text-[10px] text-on-surface-variant tracking-wider">Dedicated Service & Warranty Portal</p>
+          </div>
+        </div>
+      </div>
       
       {/* Copyright */}
-      <div className="max-w-7xl mx-auto px-8 mt-20 pt-8 border-t border-surface-container/50 flex flex-col md:flex-row justify-between items-center text-xs text-on-surface-variant/50">
-        <p>&copy; {new Date().getFullYear()} Accessomart. All rights reserved.</p>
-        <div className="flex space-x-6 mt-4 md:mt-0 font-medium">
-          <Link href="/privacy" className="hover:text-on-surface-variant">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-on-surface-variant">Terms of Service</Link>
+      <div className="max-w-7xl mx-auto px-8 mt-10 flex flex-col md:flex-row justify-between items-center text-[10px] text-on-surface-variant/40 tracking-widest font-mono">
+        <p>&copy; {new Date().getFullYear()} Accessomart Ecosystem. All protocols reserved.</p>
+        <div className="flex space-x-6 mt-4 md:mt-0 font-medium uppercase tracking-[0.2em]">
+          <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
         </div>
       </div>
     </footer>
