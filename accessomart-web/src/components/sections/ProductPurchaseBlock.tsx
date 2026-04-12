@@ -134,9 +134,16 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
         <Badge variant="primary" className="text-[10px] tracking-[0.2em] font-bold uppercase py-1 px-4 border-primary/40 text-primary">
           {brand} DIRECT
         </Badge>
-        <div className={`flex items-center gap-2 text-xs font-mono uppercase tracking-widest ${stockInfo[stockStatus].color}`}>
-          <div className={`w-2 h-2 rounded-full bg-current ${stockStatus !== 'OUT_OF_STOCK' ? 'animate-pulse' : ''}`} />
-          {stockInfo[stockStatus].label}
+        <div className={`flex flex-col items-end gap-1 ${stockInfo[stockStatus].color}`}>
+          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest">
+            <div className={`w-2 h-2 rounded-full bg-current ${stockStatus !== 'OUT_OF_STOCK' ? 'animate-pulse' : ''}`} />
+            {stockInfo[stockStatus].label}
+          </div>
+          {stockStatus === 'LIMITED_STOCK' && availableStock > 0 && (
+            <span className="text-[10px] font-bold opacity-80 animate-pulse">
+              Only {availableStock} units remaining
+            </span>
+          )}
         </div>
       </div>
 
