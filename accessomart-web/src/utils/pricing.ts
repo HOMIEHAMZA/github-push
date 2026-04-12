@@ -2,8 +2,8 @@ export const PRICING_CONFIG = {
   currency: 'AED',
   currencySymbol: 'AED',
   shippingThreshhold: 500,
-  shippingCost: 25,
-  taxRate: 0.05, // 5% VAT in UAE
+  shippingCost: 0,
+  taxRate: 0,
 };
 
 export function formatCurrency(amount: number): string {
