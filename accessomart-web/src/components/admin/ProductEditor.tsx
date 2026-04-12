@@ -442,7 +442,18 @@ export function ProductEditor({ product, brands, categories, onSave, onCancel }:
                         required
                         className="w-full px-4 py-3 bg-black border border-white/10 rounded-xl text-white outline-none focus:border-primary transition-all"
                         value={formData.basePrice || ''}
-                        onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          const newPrice = parseFloat(e.target.value) || 0;
+                          setFormData(prev => ({
+                            ...prev,
+                            basePrice: newPrice,
+                            variants: prev.variants.map(v => 
+                              v.price === prev.basePrice || v.price === 0
+                                ? { ...v, price: newPrice }
+                                : v
+                            )
+                          }));
+                        }}
                       />
                     </div>
                   </div>
