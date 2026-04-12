@@ -6,6 +6,7 @@ import { ShoppingBag, X, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCartStore } from '@/store/useCartStore';
 import { CartItem } from './CartItem';
+import { formatCurrency } from '@/utils/pricing';
 
 export const CartDrawer: React.FC = () => {
   const { isDrawerOpen, closeDrawer, items, isLoading } = useCartStore();
@@ -103,11 +104,11 @@ export const CartDrawer: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm text-white/40">
                     <span>Subtotal</span>
-                    <span className="font-mono">${subtotal.toFixed(2)}</span>
+                    <span className="font-mono">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between items-center text-white">
                     <span className="font-semibold text-lg">Total</span>
-                    <span className="font-bold text-xl font-mono text-cyan-400">${subtotal.toFixed(2)}</span>
+                    <span className="font-bold text-xl font-mono text-cyan-400">{formatCurrency(subtotal)}</span>
                   </div>
                 </div>
 

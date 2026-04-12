@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, ShieldCheck, Truck, Zap, Loader2 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { CartItem } from '@/components/cart/CartItem';
+import { formatCurrency, PRICING_CONFIG } from '@/utils/pricing';
 
 export default function CartPage() {
   const { items, isLoading } = useCartStore();
@@ -19,8 +20,8 @@ export default function CartPage() {
     return total + ((item.price || 0) * item.quantity);
   }, 0);
 
-  const shipping = subtotal > 500 ? 0 : 25;
-  const tax = subtotal * 0.08;
+  const shipping = subtotal > PRICING_CONFIG.shippingThreshhold ? 0 : PRICING_CONFIG.shippingCost;
+  const tax = subtotal * PRICING_CONFIG.taxRate;
   const total = subtotal + shipping + tax;
 
   if (!mounted) return null;
@@ -99,21 +100,21 @@ export default function CartPage() {
               <div className="space-y-4">
                 <div className="flex justify-between text-on-surface-variant">
                   <span className="text-sm">Subtotal</span>
-                  <span className="font-mono">${subtotal.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant">
                   <span className="text-sm">Obsidian Delivery</span>
                   <span className="font-mono text-primary">
-                    {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                    {shipping === 0 ? 'FREE' : formatCurrency(shipping)}
                   </span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant">
-                  <span className="text-sm">Estimated Tax (8%)</span>
-                  <span className="font-mono">${tax.toFixed(2)}</span>
+                  <span className="text-sm">Estimated Tax ({PRICING_CONFIG.taxRate * 100}%)</span>
+                  <span className="font-mono">{formatCurrency(tax)}</span>
                 </div>
                 <div className="pt-4 border-t border-surface-container-highest/10 flex justify-between items-end">
                   <span className="text-lg font-bold text-on-surface">TOTAL</span>
-                  <span className="text-2xl font-bold text-primary font-mono">${total.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-primary font-mono">{formatCurrency(total)}</span>
                 </div>
               </div>
 

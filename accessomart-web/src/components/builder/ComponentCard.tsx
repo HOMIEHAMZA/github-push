@@ -6,6 +6,7 @@ import { Check, Plus } from 'lucide-react';
 import { PCComponent } from '@/lib/builder-data';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { formatCurrency } from '@/utils/pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,7 +35,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({ component, isSelec
           {component.brand}
         </span>
         <span className="text-sm font-bold text-cyan-400 font-mono">
-          ${component.price.toFixed(2)}
+          {formatCurrency(component.price)}
         </span>
       </div>
 

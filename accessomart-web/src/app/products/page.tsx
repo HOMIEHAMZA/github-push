@@ -7,6 +7,7 @@ import { ApiProduct, ApiCategory, ApiBrand } from '@/lib/api-types';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { Loader2, AlertCircle, SlidersHorizontal, ChevronRight, Search } from 'lucide-react';
 import Link from 'next/link';
+import { formatCurrency } from '@/utils/pricing';
 
 function ProductsContent() {
   const router = useRouter();
@@ -302,7 +303,7 @@ function ProductsContent() {
                     name={p.name}
                     brand={p.brand?.name || 'Vanguard'}
                     category={p.category?.name || 'Gear'}
-                    price={`$${p.basePrice.toLocaleString()}`}
+                    price={formatCurrency(Number(p.basePrice))}
                     imageUrl={p.images?.[0]?.url || '/placeholder.png'}
                   />
                 ))}

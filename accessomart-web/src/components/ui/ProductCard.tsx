@@ -7,6 +7,7 @@ import { Heart, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useToastStore } from '@/store/useToastStore';
+import { formatCurrency } from '@/utils/pricing';
 
 interface ProductCardProps {
   id: string;
@@ -40,8 +41,8 @@ export function ProductCard({
   const { addToast } = useToastStore();
 
   const isWishlisted = checkWishlist(id);
-  const displayPrice = typeof price === 'number' ? `$${price.toLocaleString()}` : price;
-  const displayOriginalPrice = typeof originalPrice === 'number' ? `$${originalPrice.toLocaleString()}` : originalPrice;
+  const displayPrice = typeof price === 'number' ? formatCurrency(price) : price;
+  const displayOriginalPrice = typeof originalPrice === 'number' ? formatCurrency(originalPrice) : originalPrice;
 
   return (
     <div className={`

@@ -5,6 +5,7 @@ import { Heart, ShoppingCart, ShieldCheck, Truck } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/utils/pricing';
 
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
@@ -142,11 +143,11 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
       {/* Pricing */}
       <div className="flex items-baseline gap-4">
         <span className="text-4xl lg:text-5xl font-display text-on-surface tracking-tight">
-          ${Number(selectedVariant?.price || 0).toLocaleString()}
+          {formatCurrency(Number(selectedVariant?.price || 0))}
         </span>
         {selectedVariant?.comparePrice && Number(selectedVariant.comparePrice) > 0 && (
           <span className="text-xl text-on-surface-variant line-through opacity-50">
-            ${Number(selectedVariant.comparePrice).toLocaleString()}
+            {formatCurrency(Number(selectedVariant.comparePrice))}
           </span>
         )}
       </div>

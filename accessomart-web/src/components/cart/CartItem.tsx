@@ -6,6 +6,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useCartStore, type CartItem as ICartItem } from '@/store/useCartStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { formatCurrency } from '@/utils/pricing';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -92,7 +93,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
             "font-bold text-cyan-400 font-mono",
             isDrawer ? "text-sm" : "text-lg"
           )}>
-            ${(displayPrice * quantity).toFixed(2)}
+            {formatCurrency(displayPrice * quantity)}
           </p>
         </div>
  

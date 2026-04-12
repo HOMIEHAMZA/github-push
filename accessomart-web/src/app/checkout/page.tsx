@@ -11,6 +11,7 @@ import { useAddressStore } from '@/store/useAddressStore';
 import { useToastStore } from '@/store/useToastStore';
 import { ordersApi } from '@/lib/api-client';
 import { ApiAddress } from '@/lib/api-types';
+import { formatCurrency, PRICING_CONFIG } from '@/utils/pricing';
 
 import { loadStripe } from '@stripe/stripe-js';
 import { 
@@ -87,8 +88,8 @@ function CheckoutContent() {
     return total + ((item.price || 0) * item.quantity);
   }, 0);
 
-  const shipping = subtotal > 500 ? 0 : 25;
-  const tax = subtotal * 0.08;
+  const shipping = subtotal > PRICING_CONFIG.shippingThreshhold ? 0 : PRICING_CONFIG.shippingCost;
+  const tax = subtotal * PRICING_CONFIG.taxRate;
   const total = subtotal + shipping + tax;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -313,11 +314,11 @@ function CheckoutContent() {
                     <div>
                       <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none mb-1">Financial Summary</p>
                       <div className="text-xs text-zinc-400 space-y-1">
-                        <div className="flex justify-between"><span>Subtotal:</span> <span>${successMetrics.subtotal.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>Tax:</span> <span>${successMetrics.tax.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>Shipping:</span> <span>${successMetrics.shipping.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Subtotal:</span> <span>{formatCurrency(successMetrics.subtotal)}</span></div>
+                        <div className="flex justify-between"><span>Tax:</span> <span>{formatCurrency(successMetrics.tax)}</span></div>
+                        <div className="flex justify-between"><span>Shipping:</span> <span>{formatCurrency(successMetrics.shipping)}</span></div>
                         <div className="flex justify-between text-white font-bold mt-1 pt-1 border-t border-white/10">
-                           <span>Total:</span> <span className="text-primary">${successMetrics.total.toFixed(2)}</span>
+                           <span>Total:</span> <span className="text-primary">{formatCurrency(successMetrics.total)}</span>
                         </div>
                       </div>
                     </div>
@@ -742,19 +743,19 @@ function CheckoutContent() {
               <div className="space-y-4 pt-4 border-t border-surface-container-highest/10">
                 <div className="flex justify-between text-on-surface-variant text-sm">
                   <span>Subtotal</span>
-                  <span className="font-mono">${subtotal.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant text-sm">
                   <span>Logistics Protocol</span>
-                  <span className="font-mono text-primary">{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
+                  <span className="font-mono text-primary">{shipping === 0 ? 'FREE' : formatCurrency(shipping)}</span>
                 </div>
                 <div className="flex justify-between text-on-surface-variant text-sm">
                   <span>Regulatory Tax</span>
-                  <span className="font-mono">${tax.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(tax)}</span>
                 </div>
                 <div className="pt-4 border-t border-surface-container-highest/10 flex justify-between items-end">
                   <span className="text-lg font-bold text-on-surface">GRAND TOTAL</span>
-                  <span className="text-2xl font-bold text-primary font-mono">${total.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-primary font-mono">{formatCurrency(total)}</span>
                 </div>
               </div>
 
@@ -781,7 +782,7 @@ export default function CheckoutPage() {
   return (
     <PayPalScriptProvider options={{ 
       clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
-      currency: "USD",
+      currency: PRICING_CONFIG.currency,
       intent: "capture"
     }}>
       <Elements stripe={stripePromise}>

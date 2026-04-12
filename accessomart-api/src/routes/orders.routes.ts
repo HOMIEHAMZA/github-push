@@ -7,6 +7,7 @@ import { stripe } from '../lib/stripe';
 import { paypalClient } from '../lib/paypal';
 import paypal from '@paypal/checkout-server-sdk';
 import { sendOrderConfirmationEmail } from '../lib/email';
+import { PRICING_CONFIG } from '../config/pricing.config';
 
 export const orderRoutes = Router();
 
@@ -211,8 +212,8 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
     (sum, item) => sum + Number(item.variant.price) * item.quantity,
     0
   );
-  const shippingCost = subtotal > 100 ? 0 : 9.99; // Free shipping over $100
-  const taxAmount = subtotal * 0.08;               // 8% tax
+  const shippingCost = subtotal > PRICING_CONFIG.shippingThreshhold ? 0 : PRICING_CONFIG.shippingCost;
+  const taxAmount = subtotal * PRICING_CONFIG.taxRate;
   const total = subtotal + shippingCost + taxAmount;
 
   // Generate order number
@@ -228,7 +229,7 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
     try {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
-        currency: 'usd',
+        currency: PRICING_CONFIG.currency.toLowerCase(),
         metadata: { orderNumber, userId: req.userId! },
       });
       providerPaymentId = paymentIntent.id;
@@ -244,7 +245,7 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
         intent: 'CAPTURE',
         purchase_units: [{
           amount: {
-            currency_code: 'USD',
+            currency_code: PRICING_CONFIG.currency.toUpperCase(),
             value: total.toFixed(2),
           },
           description: `Order ${orderNumber} for Accessomart`,
