@@ -48,7 +48,7 @@ const ELEMENT_OPTIONS = {
 function CheckoutContent() {
   const stripe = useStripe();
   const elements = useElements();
-  const { items, clearCart } = useCartStore();
+  const { items, clearCart, initializeCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { addresses, fetchAddresses } = useAddressStore();
   const { addToast } = useToastStore();
@@ -56,6 +56,7 @@ function CheckoutContent() {
 
   useEffect(() => {
     setMounted(true);
+    initializeCart();
     if (isAuthenticated) {
       fetchAddresses();
     }

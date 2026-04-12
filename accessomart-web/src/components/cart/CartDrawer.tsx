@@ -9,12 +9,18 @@ import { CartItem } from './CartItem';
 import { formatCurrency } from '@/utils/pricing';
 
 export const CartDrawer: React.FC = () => {
-  const { isDrawerOpen, closeDrawer, items, isLoading } = useCartStore();
+  const { isDrawerOpen, closeDrawer, items, isLoading, initializeCart } = useCartStore();
   const [mounted, setMounted] = React.useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isDrawerOpen) {
+      initializeCart();
+    }
+  }, [isDrawerOpen, initializeCart]);
 
   // Calculate totals
   const subtotal = items.reduce((total, item) => {

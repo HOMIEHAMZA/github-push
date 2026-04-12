@@ -9,12 +9,13 @@ import { CartItem } from '@/components/cart/CartItem';
 import { formatCurrency, PRICING_CONFIG } from '@/utils/pricing';
 
 export default function CartPage() {
-  const { items, isLoading } = useCartStore();
+  const { items, isLoading, initializeCart } = useCartStore();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
-  }, []);
+    initializeCart();
+  }, [initializeCart]);
 
   const subtotal = items.reduce((total, item) => {
     return total + ((item.price || 0) * item.quantity);
