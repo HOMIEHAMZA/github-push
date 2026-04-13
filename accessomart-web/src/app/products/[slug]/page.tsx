@@ -2,8 +2,10 @@ import React from 'react';
 import { Metadata } from 'next';
 import { productsApi } from '@/lib/api-client';
 import ProductDetailClient from './ProductDetailClient';
+import { ProductCard } from '@/components/ui/ProductCard';
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { ApiProduct } from '@/lib/api-types';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -48,6 +50,22 @@ export default async function ProductPage({ params }: Props) {
   try {
     const { product } = await productsApi.get(slug);
 
+    // Fetch related products from the same category
+    let relatedProducts: ApiProduct[] = [];
+    if (product.category?.slug) {
+      try {
+        const { products } = await productsApi.list({ 
+          category: product.category.slug,
+          limit: 10 // Fetch enough to filter current and still have 4
+        });
+        relatedProducts = products
+          .filter(p => p.id !== product.id)
+          .slice(0, 4);
+      } catch (err) {
+        console.error('[Related Products] Fetch error:', err);
+      }
+    }
+
     // JSON-LD for SEO rich results
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -83,6 +101,36 @@ export default async function ProductPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <ProductDetailClient product={product} />
+
+        {/* Recommended Gear Section */}
+        {relatedProducts.length > 0 && (
+          <section className="max-w-[1440px] mx-auto px-6 lg:px-12 w-full py-16 lg:py-24 border-t border-surface-container-highest/10">
+            <h2 className="text-xl lg:text-2xl font-display text-on-surface mb-10 tracking-[0.2em] uppercase">
+              Recommended Gear
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {relatedProducts.map(related => {
+                 // Use first variant price if available, fallback to base price
+                 const displayPrice = related.variants?.[0]?.price || related.basePrice || 0;
+                 const comparePrice = related.variants?.[0]?.comparePrice || related.comparePrice;
+                 
+                 return (
+                  <ProductCard
+                    key={related.id}
+                    id={related.id}
+                    slug={related.slug}
+                    name={related.name}
+                    brand={related.brand?.name || 'Accessomart'}
+                    category={related.category?.name || 'General'}
+                    price={displayPrice}
+                    originalPrice={comparePrice}
+                    imageUrl={related.images?.find(img => img.isPrimary)?.url || related.images?.[0]?.url || ''}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
       </>
     );
   } catch (error) {
