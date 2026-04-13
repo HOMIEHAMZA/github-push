@@ -73,7 +73,7 @@ export function ReviewsSection({ reviews, rating, count }: ReviewsSectionProps) 
         ) : (
           <div className="p-16 text-center rounded-2xl border border-dashed border-surface-container-highest/30 bg-surface-container/10">
             <MessageCircle size={40} className="mx-auto mb-4 text-on-surface-variant opacity-20" />
-            <p className="text-on-surface-variant font-sans italic">Initial Baseline In Progress. No Public Calibrations Yet.</p>
+            <p className="text-on-surface-variant font-sans italic">Initial Baseline In Progress. Public reviews coming soon.</p>
           </div>
         )}
       </div>

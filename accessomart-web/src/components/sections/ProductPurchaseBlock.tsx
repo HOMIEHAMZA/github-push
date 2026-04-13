@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, ShoppingCart, ShieldCheck, Truck, Lock, CreditCard, Headset } from 'lucide-react';
+import { Heart, ShoppingCart, ShieldCheck, Truck, Lock, CreditCard, Headset, Star } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
@@ -160,6 +160,23 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
             {formatCurrency(Number(selectedVariant.comparePrice))}
           </span>
         )}
+      </div>
+      
+      {/* Rating Trust Block */}
+      <div className="flex items-center gap-4 bg-surface-container/30 px-4 py-3 rounded-xl border border-primary/10">
+        <div className="flex gap-0.5 text-primary">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} size={14} fill="currentColor" />
+          ))}
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs font-display font-medium text-on-surface tracking-tight">
+            5.0 System Rating
+          </span>
+          <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider opacity-60">
+            Public reviews coming soon
+          </span>
+        </div>
       </div>
 
       {/* Selection UI */}
