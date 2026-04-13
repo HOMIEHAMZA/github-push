@@ -112,61 +112,213 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
   });
 };
 
+// ─── SHARED STYLE TOKENS ──────────────────────────────────────────────────────
+
+const BRAND_COLOR = '#6366f1';
+const DIVIDER = `<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />`;
+const FOOTER = `
+  <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
+    <p style="margin: 0 0 4px 0;">Need help? Contact our support team:</p>
+    <p style="margin: 0;">
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/support/contact" style="color: ${BRAND_COLOR};">Visit Support Centre</a>
+      &nbsp;·&nbsp;
+      <a href="mailto:${process.env.SUPPORT_EMAIL || 'support@accessomart.com'}" style="color: ${BRAND_COLOR};">${process.env.SUPPORT_EMAIL || 'support@accessomart.com'}</a>
+    </p>
+    <p style="margin: 12px 0 0 0;">— The Accessomart Team</p>
+  </div>
+`;
+
+interface OrderEmailAddress {
+  firstName: string;
+  lastName: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  state?: string | null;
+  postalCode: string;
+  country?: string | null;
+}
+
+interface OrderEmailItem {
+  productName: string;
+  variantName: string;
+  quantity: number;
+  totalPrice: number;
+}
+
 /**
- * Ships an order confirmation receipt after payment clears
+ * Builds the order item rows HTML — works with stored OrderItem fields.
  */
-export const sendOrderConfirmationEmail = async (email: string, orderNumber: string, metadata: { totalAmount: number; name: string; items: any[] }) => {
-  const orderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders/${orderNumber}`;
-  
-  const itemsHtml = metadata.items.map(item => `
-    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
-      <div>
-        <p style="margin: 0; font-weight: bold; color: #1f2937;">${item.productName}</p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Variant: ${item.variantName}</p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Qty: ${item.quantity}</p>
-      </div>
-      <div style="text-align: right;">
-        <p style="margin: 0; font-weight: bold; color: #1f2937;">$${Number(item.totalPrice).toFixed(2)}</p>
-      </div>
-    </div>
+const buildItemsHtml = (items: OrderEmailItem[]): string =>
+  items.map(item => `
+    <tr>
+      <td style="padding: 12px 0; border-bottom: 1px solid #f3f4f6; vertical-align: top;">
+        <p style="margin: 0; font-weight: 600; color: #111827;">${item.productName}</p>
+        <p style="margin: 4px 0 0; font-size: 12px; color: #6b7280;">${item.variantName} &times; ${item.quantity}</p>
+      </td>
+      <td style="padding: 12px 0; border-bottom: 1px solid #f3f4f6; text-align: right; white-space: nowrap; font-weight: 600; color: #111827;">
+        $${Number(item.totalPrice).toFixed(2)}
+      </td>
+    </tr>
   `).join('');
 
-  const html = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
-      <h2 style="color: #6366f1;">Order Confirmation</h2>
-      <p>Hi ${metadata.name},</p>
-      <p>Thank you for choosing Accessomart! We've successfully received and secured your order.</p>
-      
-      <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 24px 0;">
-        <p style="margin: 0; font-weight: bold; font-size: 18px;">Order Number: <span style="font-family: monospace;">${orderNumber}</span></p>
-      </div>
-      
+/**
+ * Builds a formatted shipping address block.
+ */
+const buildAddressHtml = (addr: OrderEmailAddress): string => `
+  <p style="margin: 0; line-height: 1.7; color: #374151;">
+    ${addr.firstName} ${addr.lastName}<br>
+    ${addr.line1}${addr.line2 ? `, ${addr.line2}` : ''}<br>
+    ${addr.city}${addr.state ? `, ${addr.state}` : ''} ${addr.postalCode}<br>
+    ${addr.country ?? 'US'}
+  </p>
+`;
+
+/**
+ * Order Confirmation Email — sent immediately after a successful payment is captured.
+ * Includes: order number, itemised list, totals, shipping address, payment method, support info.
+ */
+export const sendOrderConfirmationEmail = async (
+  email: string,
+  orderNumber: string,
+  metadata: {
+    name: string;
+    totalAmount: number;
+    items: OrderEmailItem[];
+    address?: OrderEmailAddress | null;
+    paymentMethod?: string;
+  }
+) => {
+  const orderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders`;
+
+  const itemsHtml = buildItemsHtml(metadata.items);
+
+  const addressBlock = metadata.address
+    ? `
       <div style="margin: 24px 0;">
-        <h3 style="margin-bottom: 12px; color: #374151; font-size: 16px;">Purchased Items</h3>
-        <div style="border-top: 1px solid #e5e7eb;">
-          ${itemsHtml}
-        </div>
-        <div style="display: flex; justify-content: space-between; padding-top: 16px; margin-top: 8px; font-weight: bold; font-size: 18px;">
-          <span>Total Captured:</span>
-          <span>$${metadata.totalAmount.toFixed(2)}</span>
-        </div>
+        <h3 style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">Shipping Address</h3>
+        ${buildAddressHtml(metadata.address)}
+      </div>
+      ${DIVIDER}
+    `
+    : '';
+
+  const paymentBlock = metadata.paymentMethod
+    ? `<p style="margin: 0 0 4px;"><strong>Payment:</strong> ${metadata.paymentMethod}</p>`
+    : '';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+      <div style="background-color: ${BRAND_COLOR}; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">Order Confirmed ✓</h1>
+        <p style="margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">Thank you for your order, ${metadata.name}!</p>
       </div>
 
-      <p>Our autonomous logistics team is preparing your hardware for shipment. You can track your order status in real-time below:</p>
-      <div style="margin: 32px 0;">
-        <a href="${orderUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Order Status</a>
+      <div style="background-color: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px 20px; margin-bottom: 28px;">
+          <p style="margin: 0; font-size: 13px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Order Number</p>
+          <p style="margin: 4px 0 0; font-family: monospace; font-size: 20px; font-weight: 700; color: #111827;">${orderNumber}</p>
+          ${paymentBlock}
+        </div>
+
+        <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">Items Ordered</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${itemsHtml}
+          <tr>
+            <td style="padding: 16px 0 0; font-size: 16px; font-weight: 700; color: #111827;">Order Total</td>
+            <td style="padding: 16px 0 0; text-align: right; font-size: 16px; font-weight: 700; color: ${BRAND_COLOR};">$${metadata.totalAmount.toFixed(2)}</td>
+          </tr>
+        </table>
+
+        ${DIVIDER}
+        ${addressBlock}
+
+        <p style="margin: 0 0 24px; color: #374151; font-size: 14px; line-height: 1.6;">
+          We are preparing your order for shipment. You'll receive another email with tracking details once your package is on its way.
+        </p>
+
+        <a href="${orderUrl}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none;">
+          View My Orders
+        </a>
+
+        ${FOOTER}
       </div>
-      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280;">
-        <p>If you need assistance with your deployment, please visit our <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/support" style="color: #6366f1;">Support Nexus</a> or reply directly to this transmission.</p>
-        <p>We'll notify you as soon as tracking coordinates are assigned.</p>
-      </div>
-      <p style="margin-top: 24px;">Best regards,<br>The Accessomart Protocol Team</p>
     </div>
   `;
 
   await sendMail({
     to: email,
-    subject: `Accessomart - Order Received (${orderNumber})`,
+    subject: `Accessomart — Order Confirmed: ${orderNumber}`,
+    html,
+  });
+};
+
+/**
+ * Shipping Notification Email — sent when an admin marks an order as SHIPPED.
+ * Includes: order number, tracking number (optional), estimated delivery info.
+ */
+export const sendShippingNotificationEmail = async (
+  email: string,
+  data: {
+    name: string;
+    orderNumber: string;
+    trackingNumber?: string | null;
+    carrier?: string | null;
+    address?: OrderEmailAddress | null;
+  }
+) => {
+  const orderUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/orders`;
+
+  const trackingBlock = data.trackingNumber
+    ? `
+      <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px 20px; margin: 24px 0;">
+        <p style="margin: 0; font-size: 13px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Tracking Number</p>
+        <p style="margin: 4px 0 0; font-family: monospace; font-size: 18px; font-weight: 700; color: #111827;">${data.trackingNumber}</p>
+        ${data.carrier ? `<p style="margin: 4px 0 0; font-size: 13px; color: #6b7280;">Carrier: ${data.carrier}</p>` : ''}
+      </div>
+    `
+    : `
+      <p style="color: #374151; font-size: 14px;">Tracking information will be available shortly from your carrier.</p>
+    `;
+
+  const addressBlock = data.address
+    ? `
+      ${DIVIDER}
+      <h3 style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">Delivering To</h3>
+      ${buildAddressHtml(data.address)}
+    `
+    : '';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+      <div style="background-color: #059669; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">Your Order Is On Its Way 🚚</h1>
+        <p style="margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">Good news, ${data.name} — your package has been dispatched!</p>
+      </div>
+
+      <div style="background-color: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px 20px; margin-bottom: 28px;">
+          <p style="margin: 0; font-size: 13px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Order Number</p>
+          <p style="margin: 4px 0 0; font-family: monospace; font-size: 20px; font-weight: 700; color: #111827;">${data.orderNumber}</p>
+        </div>
+
+        ${trackingBlock}
+        ${addressBlock}
+
+        ${DIVIDER}
+
+        <a href="${orderUrl}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none;">
+          Track My Order
+        </a>
+
+        ${FOOTER}
+      </div>
+    </div>
+  `;
+
+  await sendMail({
+    to: email,
+    subject: `Accessomart — Your Order ${data.orderNumber} Has Shipped`,
     html,
   });
 };

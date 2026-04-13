@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { stripe } from '../lib/stripe';
 import { paypalClient } from '../lib/paypal';
 import paypal from '@paypal/checkout-server-sdk';
-import { sendOrderConfirmationEmail } from '../lib/email';
+import { sendOrderConfirmationEmail, sendShippingNotificationEmail } from '../lib/email';
 import { PRICING_CONFIG } from '../config/pricing.config';
 
 export const orderRoutes = Router();
@@ -87,11 +87,11 @@ orderRoutes.post('/webhook/stripe', async (req: any, res) => {
 async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
   const order = await prisma.order.findUnique({
     where: { orderNumber },
-    include: { payment: true, items: true, user: true },
+    include: { payment: true, items: true, user: true, address: true },
   });
 
   if (!order) throw new Error('Order not found.');
-  
+
   // Idempotency check: If already confirmed, skip
   if (order.status === 'CONFIRMED' || order.payment?.status === 'CAPTURED') {
     return;
@@ -131,10 +131,18 @@ async function finalizeOrder(orderNumber: string, paymentMetadata: any) {
 
   // Dispatch order confirmation email asynchronously
   if (order.user) {
+    const paymentMethod = order.payment?.provider ?? undefined;
     sendOrderConfirmationEmail(order.user.email, orderNumber, {
-      totalAmount: Number((order as any).total || 0),
       name: order.user.firstName,
-      items: order.items,
+      totalAmount: Number((order as any).total ?? 0),
+      items: order.items.map(i => ({
+        productName: i.productName,
+        variantName: i.variantName,
+        quantity: i.quantity,
+        totalPrice: Number(i.totalPrice),
+      })),
+      address: (order as any).address ?? null,
+      paymentMethod,
     }).catch(err => {
       console.error('[OrderFinalize] Failed to dispatch order confirmation email:', err);
     });
@@ -436,7 +444,23 @@ orderRoutes.patch('/:id/status', authenticate, requireAdmin, validate(orderStatu
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data: updateData,
+      include: { user: true, address: true },
     });
+
+    // Fire shipping notification when status transitions to SHIPPED
+    if (status === 'SHIPPED' && (order as any).user) {
+      const u = (order as any).user;
+      const addr = (order as any).address ?? null;
+      sendShippingNotificationEmail(u.email, {
+        name: u.firstName,
+        orderNumber: order.orderNumber,
+        trackingNumber: null, // extend later when tracking is stored on the order
+        carrier: null,
+        address: addr,
+      }).catch(err => {
+        console.error('[Orders API] Failed to dispatch shipping notification email:', err);
+      });
+    }
 
     return res.json({ order });
   } catch (error: any) {
