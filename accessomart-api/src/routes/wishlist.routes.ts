@@ -17,7 +17,8 @@ wishlistRoutes.get('/', authenticate, async (req: AuthRequest, res) => {
           },
           variants: {
             take: 1
-          }
+          },
+          brand: true
         }
       }
     },
@@ -43,10 +44,24 @@ wishlistRoutes.post('/', authenticate, async (req: AuthRequest, res) => {
           productId
         }
       },
-      update: {}, // No-op if already exists
+      update: {},
       create: {
         userId: req.userId!,
         productId
+      },
+      include: {
+        product: {
+          include: {
+            images: {
+              where: { isPrimary: true },
+              take: 1
+            },
+            variants: {
+              take: 1
+            },
+            brand: true
+          }
+        }
       }
     });
 

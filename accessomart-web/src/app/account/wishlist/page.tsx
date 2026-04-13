@@ -59,12 +59,13 @@ export default function WishlistPage() {
         </div>
       ) : items.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {items.map((item) => {
-            const product = item.product;
-            const primaryImage = product.images.find(img => img.isPrimary) || product.images[0];
+          {items.filter((item) => !!item.product).map((item) => {
+            const product = item.product!;
+            const images = product.images ?? [];
+            const primaryImage = images.find(img => img.isPrimary) ?? images[0];
             const defaultVariant = product.variants?.[0];
-            const rating = product.averageRating || 0;
-            const reviewCount = product.reviewCount || 0;
+            const rating = product.averageRating ?? 0;
+            const reviewCount = product.reviewCount ?? 0;
 
             return (
               <div key={item.id} className="group relative bg-surface-container-low border border-surface-container-highest/10 rounded-2xl overflow-hidden hover:border-primary/30 transition-all duration-500 shadow-xl">
@@ -88,7 +89,7 @@ export default function WishlistPage() {
                     <div>
                       <div className="flex items-start justify-between">
                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 bg-primary/5 px-2 py-0.5 rounded leading-tight mb-2 inline-block border border-primary/10">
-                           {product.brand?.name || 'Electronics'}
+                           {product.brand?.name ?? 'Electronics'}
                          </p>
                          <button 
                            onClick={() => toggleWishlist(product.id)}
