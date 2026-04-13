@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, ShoppingCart, ShieldCheck, Truck } from 'lucide-react';
+import { Heart, ShoppingCart, ShieldCheck, Truck, Lock, CreditCard, Headset } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
@@ -138,6 +138,9 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest">
             <div className={`w-2 h-2 rounded-full bg-current ${stockStatus !== 'OUT_OF_STOCK' ? 'animate-pulse' : ''}`} />
             {stockInfo[stockStatus].label}
+          </div>
+          <div className="text-[10px] font-medium text-on-surface-variant/70 mt-1">
+            Delivery estimate: 3–5 business days
           </div>
           {stockStatus === 'LIMITED_STOCK' && availableStock > 0 && (
             <span className="text-[10px] font-bold opacity-80 animate-pulse">
@@ -345,15 +348,23 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
         </PrimaryButton>
       </div>
 
-      {/* Features List */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-surface-container-highest/10">
-        <div className="flex items-center gap-3 text-xs text-on-surface-variant font-sans tracking-wide">
-          <Truck size={16} className="text-primary" />
-          Rapid Obsidian Delivery
+      {/* Trust & Features List */}
+      <div className="grid grid-cols-2 gap-y-4 gap-x-2 pt-6 border-t border-surface-container-highest/10">
+        <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+          <Lock size={14} className="text-primary" />
+          Secure Checkout
         </div>
-        <div className="flex items-center gap-3 text-xs text-on-surface-variant font-sans tracking-wide">
-          <ShieldCheck size={16} className="text-primary" />
-          24-Cycle Protection
+        <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+          <CreditCard size={14} className="text-primary" />
+          Stripe & PayPal Protected
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+          <Truck size={14} className="text-primary" />
+          Fast Logistics
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
+          <Headset size={14} className="text-primary" />
+          Support & Warranty
         </div>
       </div>
     </div>
