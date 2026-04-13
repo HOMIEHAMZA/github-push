@@ -42,7 +42,16 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
       setFormBody('');
       router.refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to submit review');
+      let message = err.message || 'Failed to submit review';
+      try {
+        const parsed = JSON.parse(message);
+        if (Array.isArray(parsed) && parsed[0]?.message) {
+          message = parsed[0].message;
+        }
+      } catch {
+        // Not a JSON error, use original message
+      }
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
