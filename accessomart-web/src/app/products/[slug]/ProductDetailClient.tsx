@@ -53,6 +53,8 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               productId={product.id}
               variants={product.variants || []}
               brand={product.brand?.name || 'Accessomart'}
+              rating={product.averageRating || 0}
+              reviewCount={product.reviewCount || 0}
             />
           </div>
         </div>

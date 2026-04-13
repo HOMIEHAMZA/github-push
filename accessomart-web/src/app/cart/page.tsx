@@ -2,20 +2,25 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, ShieldCheck, Truck, Zap, Loader2 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
+import { useWishlistStore } from '@/store/useWishlistStore';
 import { CartItem } from '@/components/cart/CartItem';
 import { formatCurrency, PRICING_CONFIG } from '@/utils/pricing';
+import { Bookmark, ShoppingCart, Trash2 } from 'lucide-react';
 
 export default function CartPage() {
-  const { items, isLoading, initializeCart } = useCartStore();
+  const { items, isLoading, initializeCart, addItem } = useCartStore();
+  const { items: wishlistItems, fetchWishlist, toggleWishlist } = useWishlistStore();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
     initializeCart();
-  }, [initializeCart]);
+    fetchWishlist();
+  }, [initializeCart, fetchWishlist]);
 
   const subtotal = items.reduce((total, item) => {
     return total + ((item.price || 0) * item.quantity);
@@ -139,6 +144,57 @@ export default function CartPage() {
                 </div>
               </div>
             </div>
+
+            {/* Saved Items in Sidebar - Quick View */}
+            {wishlistItems.length > 0 && (
+              <div className="p-6 rounded-2xl bg-surface-container border border-surface-container-highest/10 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-on-surface tracking-tight uppercase border-b border-white/5 pb-3">
+                  <Bookmark size={16} className="text-primary" />
+                  Saved Items
+                </div>
+                <div className="space-y-3">
+                  {wishlistItems.slice(0, 3).map((wi) => (
+                    <div key={wi.id} className="group relative flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                      <div className="relative w-12 h-12 rounded bg-black/40 border border-white/5 overflow-hidden shrink-0">
+                         {wi.product.images?.[0] && (
+                           <Image 
+                             src={wi.product.images[0].url} 
+                             alt={wi.product.name} 
+                             fill 
+                             className="object-contain p-1"
+                           />
+                         )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-white truncate">{wi.product.name}</p>
+                        <p className="text-[10px] text-primary font-mono">{formatCurrency(wi.product.basePrice)}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const defaultVariantId = wi.product.variants?.find(v => v.isDefault)?.id || wi.product.variants?.[0]?.id;
+                          if (defaultVariantId) {
+                            await addItem(defaultVariantId);
+                            await toggleWishlist(wi.productId);
+                          }
+                        }}
+                        className="p-2 opacity-0 group-hover:opacity-100 text-primary hover:bg-primary/20 rounded-lg transition-all"
+                        title="Move to Cart"
+                      >
+                        <ShoppingCart size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {wishlistItems.length > 3 && (
+                    <Link 
+                      href="/account/wishlist" 
+                      className="block text-center text-[10px] font-bold text-on-surface-variant hover:text-primary transition-colors uppercase tracking-[0.2em] pt-2"
+                    >
+                      View All Saved ({wishlistItems.length})
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

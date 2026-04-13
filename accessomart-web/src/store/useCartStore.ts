@@ -4,6 +4,7 @@ import { useToastStore } from '@/store/useToastStore';
 
 export interface CartItem {
   id: string; // The backend CartItem ID
+  productId: string;
   variantId: string;
   quantity: number;
   name: string;
@@ -49,6 +50,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       // Map backend ApiCartItem to Zustand CartItem
       const mappedItems: CartItem[] = items.map((apiItem) => ({
         id: apiItem.id,
+        productId: apiItem.variant.product.id,
         variantId: apiItem.variantId,
         quantity: apiItem.quantity,
         cartId: apiItem.cartId,

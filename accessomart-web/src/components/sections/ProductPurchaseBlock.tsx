@@ -16,9 +16,17 @@ interface ProductPurchaseBlockProps {
   productId: string;
   variants: ApiProductVariant[];
   brand: string;
+  rating?: number;
+  reviewCount?: number;
 }
 
-export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurchaseBlockProps) {
+export function ProductPurchaseBlock({ 
+  productId, 
+  variants, 
+  brand,
+  rating = 0,
+  reviewCount = 0
+}: ProductPurchaseBlockProps) {
   const { addItem, openDrawer } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const { addToast } = useToastStore();
@@ -166,15 +174,20 @@ export function ProductPurchaseBlock({ productId, variants, brand }: ProductPurc
       <div className="flex items-center gap-4 bg-surface-container/30 px-4 py-3 rounded-xl border border-primary/10">
         <div className="flex gap-0.5 text-primary">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Star key={i} size={14} fill="currentColor" />
+            <Star 
+              key={i} 
+              size={14} 
+              fill={i < Math.floor(rating) ? "currentColor" : "none"} 
+              className={i < Math.floor(rating) ? "" : "opacity-30"}
+            />
           ))}
         </div>
         <div className="flex flex-col">
           <span className="text-xs font-display font-medium text-on-surface tracking-tight">
-            5.0 System Rating
+            {rating > 0 ? `${rating.toFixed(1)} System Rating` : "No Ratings Yet"}
           </span>
           <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider opacity-60">
-            Public reviews coming soon
+            {reviewCount > 0 ? `Based on ${reviewCount} review${reviewCount === 1 ? '' : 's'}` : "Be the first to calibrate"}
           </span>
         </div>
       </div>

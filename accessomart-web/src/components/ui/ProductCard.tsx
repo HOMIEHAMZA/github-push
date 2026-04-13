@@ -8,6 +8,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useToastStore } from '@/store/useToastStore';
 import { formatCurrency } from '@/utils/pricing';
+import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
   id: string;
@@ -52,24 +53,30 @@ export function ProductCard({
       ${isFeatured ? 'shadow-[inset_0_0_1px_#8ff5ff,0_0_8px_rgba(143,245,255,0.2)]' : ''}
     `}>
       {/* Quick Actions */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 translate-x-12 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
+      <div className={cn(
+        "absolute top-4 right-4 z-10 flex flex-col gap-2 transition-all duration-300",
+        "lg:translate-x-12 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100"
+      )}>
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             toggleWishlist(id);
-            addToast(isWishlisted ? 'Removed from Wishlist' : 'Added to Wishlist', 'info');
           }}
           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
           title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          className={`
-            p-2 rounded-lg backdrop-blur-md border transition-all
-            ${isWishlisted 
-              ? 'bg-red-500/20 border-red-500/40 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
-              : 'bg-black/40 border-white/10 text-white/60 hover:text-white hover:border-white/20'}
-          `}
+          className={cn(
+            "p-2.5 rounded-xl backdrop-blur-md border transition-all duration-500",
+            isWishlisted 
+              ? "bg-red-500/20 border-red-500/40 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)] scale-110" 
+              : "bg-black/40 border-white/10 text-white/60 hover:text-white hover:border-white/20"
+          )}
         >
-          <Heart size={18} fill={isWishlisted ? 'currentColor' : 'none'} />
+          <Heart 
+            size={18} 
+            fill={isWishlisted ? 'currentColor' : 'none'} 
+            className={cn(isWishlisted && "animate-pulse")}
+          />
         </button>
         <button
           onClick={async (e) => {
@@ -85,7 +92,7 @@ export function ProductCard({
           }}
           aria-label="Add to cart"
           title="Add to cart"
-          className="p-2 rounded-lg bg-primary/20 backdrop-blur-md border border-primary/40 text-primary hover:bg-primary/30 hover:shadow-[0_0_15px_rgba(143,245,255,0.3)] transition-all"
+          className="p-2.5 rounded-xl bg-primary/20 backdrop-blur-md border border-primary/40 text-primary hover:bg-primary/30 hover:shadow-[0_0_20px_rgba(143,245,255,0.4)] transition-all"
         >
           <Plus size={18} />
         </button>

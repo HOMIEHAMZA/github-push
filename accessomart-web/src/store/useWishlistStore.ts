@@ -36,7 +36,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
     const { addToast } = useToastStore.getState();
     
     if (!isAuthenticated) {
-      addToast('Please log in to save to your wishlist', 'info');
+      addToast('Please log in to save items', 'info');
       return;
     }
 
@@ -51,14 +51,14 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
           items: state.items.filter((i) => i.productId !== productId),
           isLoading: false
         }));
-        addToast('Removed from wishlist', 'info');
+        addToast('Removed from Wishlist', 'info');
       } else {
         const { item } = await wishlistApi.add(productId);
         set((state) => ({
           items: [...state.items, item],
           isLoading: false
         }));
-        addToast('Added to wishlist', 'success');
+        addToast('Added to Wishlist', 'success');
       }
     } catch (err: any) {
       set({ error: err.message, isLoading: false });

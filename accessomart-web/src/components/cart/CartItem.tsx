@@ -2,8 +2,10 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Minus, Plus, Trash2, Bookmark } from 'lucide-react';
 import { useCartStore, type CartItem as ICartItem } from '@/store/useCartStore';
+import { useWishlistStore } from '@/store/useWishlistStore';
+import { useToastStore } from '@/store/useToastStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { formatCurrency } from '@/utils/pricing';
@@ -30,6 +32,10 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
     imageUrl 
   } = item;
   const { updateQuantity, removeItem } = useCartStore();
+  const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const { addToast } = useToastStore();
+  
+  const isWishlisted = isInWishlist(item.productId);
 
   const displayName = isCustomBuild ? buildName : name;
   const displayBrand = isCustomBuild ? "Custom Build" : brand;
@@ -123,13 +129,31 @@ export const CartItem: React.FC<CartItemProps> = ({ item, variant = 'drawer' }) 
             </button>
           </div>
  
-          <button
-            onClick={() => removeItem(id)}
-            title="Remove item"
-            className="p-2 text-white/30 hover:text-red-400 transition-colors"
-          >
-            <Trash2 size={isDrawer ? 16 : 18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={async () => {
+                 if (!isWishlisted) {
+                    await toggleWishlist(item.productId);
+                 }
+                 await removeItem(id);
+                 addToast('Removed from Cart and saved to Wishlist', 'success');
+              }}
+              title="Save for Later"
+              className={cn(
+                "p-2 transition-colors",
+                isWishlisted ? "text-primary" : "text-white/30 hover:text-primary"
+              )}
+            >
+              <Bookmark size={isDrawer ? 16 : 18} fill={isWishlisted ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              onClick={() => removeItem(id)}
+              title="Remove item"
+              className="p-2 text-white/30 hover:text-red-400 transition-colors"
+            >
+              <Trash2 size={isDrawer ? 16 : 18} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
