@@ -152,7 +152,11 @@ productRoutes.get('/:slug', async (req, res) => {
           orderBy: { createdAt: 'desc' },
           take: 20,
         },
-        _count: { select: { reviews: true } },
+        _count: { 
+          select: { 
+            reviews: { where: { isApproved: true } } 
+          } 
+        },
       },
     }),
     prisma.review.aggregate({
@@ -197,6 +201,57 @@ productRoutes.post('/:id/reviews', authenticate, validate(reviewSchema), async (
       return res.status(400).json({ error: 'You have already reviewed this product.' });
     }
     return res.status(500).json({ error: 'Failed to submit review.', details: error.message });
+  }
+});
+
+// ─── PATCH /api/v1/products/:id/reviews/:reviewId ─────────────────────────────
+productRoutes.patch('/:id/reviews/:reviewId', authenticate, validate(reviewSchema.partial()), async (req: AuthRequest, res) => {
+  try {
+    const { reviewId } = req.params;
+    
+    // Verify ownership
+    const existing = await prisma.review.findUnique({
+      where: { id: reviewId }
+    });
+
+    if (!existing) return res.status(404).json({ error: 'Review not found.' });
+    if (existing.userId !== req.userId && req.userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Unauthorized to edit this review.' });
+    }
+
+    const review = await prisma.review.update({
+      where: { id: reviewId },
+      data: req.body,
+    });
+
+    return res.json({ review });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to update review.', details: error.message });
+  }
+});
+
+// ─── DELETE /api/v1/products/:id/reviews/:reviewId ────────────────────────────
+productRoutes.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { reviewId } = req.params;
+
+    // Verify ownership
+    const existing = await prisma.review.findUnique({
+      where: { id: reviewId }
+    });
+
+    if (!existing) return res.status(404).json({ error: 'Review not found.' });
+    if (existing.userId !== req.userId && req.userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Unauthorized to delete this review.' });
+    }
+
+    await prisma.review.delete({
+      where: { id: reviewId }
+    });
+
+    return res.json({ message: 'Review deleted successfully.' });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to delete review.', details: error.message });
   }
 });
 

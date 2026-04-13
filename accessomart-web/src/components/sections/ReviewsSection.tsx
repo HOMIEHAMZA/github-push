@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, MessageCircle, Info, Loader2 } from 'lucide-react';
+import { Star, MessageCircle, Info, Loader2, Edit2, Trash2, X } from 'lucide-react';
 import { ApiReview } from '@/lib/api-types';
 import { useAuthStore } from '@/store/useAuthStore';
 import { productsApi } from '@/lib/api-client';
@@ -15,13 +15,15 @@ interface ReviewsSectionProps {
 }
 
 export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSectionProps) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
 
   const [formRating, setFormRating] = useState(5);
   const [formBody, setFormBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
 
   // Calculate distributions if reviews exist
   const distribution = [0, 0, 0, 0, 0];
@@ -36,11 +38,23 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
     if (!formBody.trim()) return;
     setIsSubmitting(true);
     setError('');
+    setSuccess('');
     
     try {
-      await productsApi.submitReview(productId, { rating: formRating, body: formBody });
+      if (editingReviewId) {
+        await productsApi.updateReview(productId, editingReviewId, { rating: formRating, body: formBody });
+        setSuccess('Calibration uplink updated successfully.');
+        setEditingReviewId(null);
+      } else {
+        await productsApi.submitReview(productId, { rating: formRating, body: formBody });
+        setSuccess('Calibration uplink transmitted successfully.');
+      }
       setFormBody('');
+      setFormRating(5);
       router.refresh();
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       let message = err.message || 'Failed to submit review';
       try {
@@ -54,6 +68,34 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
       setError(message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const startEdit = (review: ApiReview) => {
+    setEditingReviewId(review.id);
+    setFormRating(review.rating);
+    setFormBody(review.body || '');
+    setError('');
+    setSuccess('');
+    window.scrollTo({ top: document.getElementById('review-form')?.offsetTop ? document.getElementById('review-form')!.offsetTop - 100 : 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingReviewId(null);
+    setFormRating(5);
+    setFormBody('');
+  };
+
+  const handleDelete = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to purge this calibration data? This action is irreversible.')) return;
+    
+    try {
+      await productsApi.deleteReview(productId, reviewId);
+      setSuccess('Calibration purged from databanks.');
+      router.refresh();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete review');
     }
   };
 
@@ -114,18 +156,41 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
               >
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h4 className="font-display text-lg text-on-surface mb-1 tracking-tight">
+                    <h4 className="font-display text-lg text-on-surface mb-1 tracking-tight flex items-center gap-2">
                       {review.user?.firstName || 'Anonymous'}
+                      {review.userId === user?.id && (
+                        <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">You</span>
+                      )}
                     </h4>
                     <p className="text-xs text-on-surface-variant font-mono uppercase tracking-widest opacity-60">Verified Origin • {new Date(review.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex gap-1 text-primary">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} size={14} fill={i < review.rating ? 'currentColor' : 'none'} className={i < review.rating ? '' : 'opacity-20'} />
-                    ))}
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="flex gap-1 text-primary">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} size={14} fill={i < review.rating ? 'currentColor' : 'none'} className={i < review.rating ? '' : 'opacity-20'} />
+                      ))}
+                    </div>
+                    {review.userId === user?.id && (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => startEdit(review)}
+                          className="p-2 text-on-surface-variant hover:text-primary transition-colors bg-surface-container rounded-lg border border-surface-container-highest/10"
+                          title="Edit Calibration"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(review.id)}
+                          className="p-2 text-on-surface-variant hover:text-red-400 transition-colors bg-surface-container rounded-lg border border-surface-container-highest/10"
+                          title="Purge Calibration"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <p className="text-on-surface font-sans leading-relaxed tracking-wide italic">
+                <p className="text-on-surface font-sans leading-relaxed tracking-wide italic whitespace-pre-wrap">
                   "{review.body}"
                 </p>
               </div>
@@ -139,13 +204,23 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
         </div>
 
         {/* Right Col: Submit Review Form */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1" id="review-form">
           <div className="p-8 rounded-2xl bg-surface-container-low border border-surface-container-highest/10 sticky top-24">
-            <h4 className="font-display text-xl text-on-surface mb-6 uppercase tracking-tight">Add Calibration</h4>
+            <div className="flex justify-between items-center mb-6">
+              <h4 className="font-display text-xl text-on-surface uppercase tracking-tight">
+                {editingReviewId ? 'Edit Calibration' : 'Add Calibration'}
+              </h4>
+              {editingReviewId && (
+                <button onClick={cancelEdit} className="text-on-surface-variant hover:text-on-surface transition-colors" title="Cancel Edit">
+                  <X size={20} />
+                </button>
+              )}
+            </div>
             
             {isAuthenticated ? (
               <form onSubmit={handleSubmit} className="flex flex-col gap-6">
                 {error && <div className="p-4 bg-red-500/10 border border-red-500/40 text-red-400 text-xs font-mono uppercase tracking-widest rounded-lg">{error}</div>}
+                {success && <div className="p-4 bg-primary/10 border border-primary/40 text-primary text-xs font-mono uppercase tracking-widest rounded-lg">{success}</div>}
                 
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-widest text-on-surface-variant mb-3">Rating</label>
@@ -174,14 +249,23 @@ export function ReviewsSection({ productId, reviews, rating, count }: ReviewsSec
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !formBody.trim()}
-                  className="w-full py-4 rounded-xl bg-primary text-on-primary font-display uppercase tracking-widest hover:shadow-[0_0_20px_rgba(143,245,255,0.4)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : 'Submit Uplink'}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !formBody.trim()}
+                    className="w-full py-4 rounded-xl bg-primary text-on-primary font-display uppercase tracking-widest hover:shadow-[0_0_20px_rgba(143,245,255,0.4)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : editingReviewId ? 'Update Calibration' : 'Submit Uplink'}
+                  </button>
+                  {editingReviewId && (
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="w-full py-4 rounded-xl border border-surface-container-highest/20 text-on-surface-variant font-display uppercase tracking-widest hover:bg-surface-container-highest/10 transition-all duration-300"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </form>
             ) : (
               <div className="text-center py-8">
                 <p className="text-sm font-sans text-on-surface-variant mb-6">You must establish a secure connection to input calibration data.</p>

@@ -187,7 +187,7 @@ export const productsApi = {
   },
 
   get: (slug: string) =>
-    apiFetch<{ product: ApiProduct }>(`/products/${slug}`),
+    apiFetch<{ product: ApiProduct }>(`/products/${slug}`, { cache: 'no-store' }),
 
   // Admin
   create: (data: Partial<ApiProduct>) =>
@@ -209,6 +209,17 @@ export const productsApi = {
     apiFetch<{ review: any }>(`/products/${productId}/reviews`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  
+  updateReview: (productId: string, reviewId: string, data: { rating?: number; title?: string; body?: string }) =>
+    apiFetch<{ review: any }>(`/products/${productId}/reviews/${reviewId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteReview: (productId: string, reviewId: string) =>
+    apiFetch<{ message: string }>(`/products/${productId}/reviews/${reviewId}`, {
+      method: 'DELETE',
     }),
 };
 
