@@ -25,6 +25,12 @@ const productCreateSchema = z.object({
 
 const productUpdateSchema = productCreateSchema.partial();
 
+const reviewSchema = z.object({
+  rating: z.number().min(1).max(5),
+  title: z.string().optional(),
+  body: z.string().min(5),
+});
+
 // ─── GET /api/v1/products ─────────────────────────────────────────────────────
 // Supports: ?category=slug&brand=slug&search=term&sort=price_asc|price_desc|newest|popular&page=1&limit=20&minPrice=10&maxPrice=100
 productRoutes.get('/', async (req, res, next) => {
@@ -127,30 +133,71 @@ productRoutes.get('/', async (req, res, next) => {
 
 // ─── GET /api/v1/products/:slug ───────────────────────────────────────────────
 productRoutes.get('/:slug', async (req, res) => {
-  const product = await prisma.product.findUnique({
-    where: { slug: req.params.slug },
-    include: {
-      brand: true,
-      category: true,
-      images: { orderBy: { sortOrder: 'asc' } },
-      variants: {
-        where: { isActive: { not: false } },
-        include: { inventory: true },
-        orderBy: { price: 'asc' },
+  const [product, reviewStats] = await Promise.all([
+    prisma.product.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        brand: true,
+        category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: {
+          where: { isActive: { not: false } },
+          include: { inventory: true },
+          orderBy: { price: 'asc' },
+        },
+        specs: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }] },
+        reviews: {
+          where: { isApproved: true },
+          include: { user: { select: { firstName: true, lastName: true, avatarUrl: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+        _count: { select: { reviews: true } },
       },
-      specs: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }] },
-      reviews: {
-        where: { isApproved: true },
-        include: { user: { select: { firstName: true, lastName: true, avatarUrl: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      },
-      _count: { select: { reviews: true } },
-    },
-  });
+    }),
+    prisma.review.aggregate({
+      where: { product: { slug: req.params.slug }, isApproved: true },
+      _avg: { rating: true },
+    })
+  ]);
 
   if (!product) return res.status(404).json({ error: 'Product not found.' });
-  return res.json({ product });
+  
+  const averageRating = reviewStats._avg.rating ? Number(reviewStats._avg.rating.toFixed(1)) : 0;
+  
+  return res.json({ 
+    product: { 
+      ...product, 
+      averageRating, 
+      reviewCount: product._count.reviews 
+    } 
+  });
+});
+
+// ─── POST /api/v1/products/:id/reviews ────────────────────────────────────────
+productRoutes.post('/:id/reviews', authenticate, validate(reviewSchema), async (req: AuthRequest, res) => {
+  try {
+    const { rating, title, body } = req.body;
+    
+    // Create the review
+    const review = await prisma.review.create({
+      data: {
+        rating,
+        title,
+        body,
+        isApproved: true, // MVP: auto-approve
+        userId: req.userId!,
+        productId: req.params.id,
+      }
+    });
+
+    return res.status(201).json({ review });
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'You have already reviewed this product.' });
+    }
+    return res.status(500).json({ error: 'Failed to submit review.', details: error.message });
+  }
 });
 
 // ─── POST /api/v1/products (Admin only) ───────────────────────────────────────

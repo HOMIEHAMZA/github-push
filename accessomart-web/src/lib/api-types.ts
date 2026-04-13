@@ -153,6 +153,8 @@ export interface ApiProduct {
   variants: ApiProductVariant[];
   specs?: ApiProductSpec[];
   reviews?: ApiReview[];
+  averageRating?: number;
+  reviewCount?: number;
   _count?: { reviews: number };
   createdAt: string;
   updatedAt?: string;

@@ -204,6 +204,12 @@ export const productsApi = {
 
   archive: (id: string) =>
     apiFetch(`/products/${id}`, { method: 'DELETE' }),
+
+  submitReview: (productId: string, data: { rating: number; title?: string; body: string }) =>
+    apiFetch<{ review: any }>(`/products/${productId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // =============================================================================

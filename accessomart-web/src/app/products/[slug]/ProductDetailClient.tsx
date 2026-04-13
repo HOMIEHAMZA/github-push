@@ -20,14 +20,8 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
     value: spec.specValue,
     active: true,
   })) || [];
-  const reviews = product.reviews?.map((review, index) => ({
-    id: review.id || `review-${index}`,
-    userName: review.user?.firstName || 'Anonymous',
-    rating: review.rating,
-    comment: review.body || '',
-    date: new Date(review.createdAt).toLocaleDateString(),
-  })) || [];
-  const rating = 5; // Defaulted mock data for UI logic purposes
+  const reviews = product.reviews || [];
+  const rating = product.averageRating || 0;
 
   return (
     <div className="grow flex flex-col pt-24 lg:pt-32">
@@ -91,9 +85,10 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           </div>
           
           <ReviewsSection 
+            productId={product.id}
             reviews={reviews} 
             rating={rating} 
-            count={product._count?.reviews || reviews.length} 
+            count={product.reviewCount || reviews.length} 
           />
         </section>
       </main>
