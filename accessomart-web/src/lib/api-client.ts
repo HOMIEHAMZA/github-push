@@ -187,7 +187,7 @@ export const productsApi = {
   },
 
   get: (slug: string) =>
-    apiFetch<{ product: ApiProduct }>(`/products/${slug}`, { cache: 'no-store' }),
+    apiFetch<{ product: ApiProduct }>(`/products/${slug}`, { next: { revalidate: 60 } } as RequestInit),
 
   // Admin
   create: (data: Partial<ApiProduct>) =>
