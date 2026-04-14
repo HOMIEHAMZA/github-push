@@ -32,6 +32,7 @@ export default function OrderManager() {
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [updatingPaymentId, setUpdatingPaymentId] = useState<string | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const toggleOrderExpand = (id: string) => {
@@ -75,6 +76,25 @@ export default function OrderManager() {
       addToast('Failed to update order status', 'error');
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  const handleMarkCodPaid = async (orderId: string) => {
+    try {
+      setUpdatingPaymentId(orderId);
+      await adminApi.updatePaymentStatus(orderId, 'CAPTURED');
+      addToast('Payment marked as paid', 'success');
+      // Update local state so UI reflects immediately
+      setOrders(prev => prev.map(order =>
+        order.id === orderId && order.payment
+          ? { ...order, payment: { ...order.payment, status: 'CAPTURED' } }
+          : order
+      ));
+    } catch (error) {
+      console.error('Failed to mark payment as paid:', error);
+      addToast('Failed to update payment status', 'error');
+    } finally {
+      setUpdatingPaymentId(null);
     }
   };
 
@@ -132,8 +152,17 @@ export default function OrderManager() {
                         {getCustomerName(order)} • {order._count?.items || 0} Items • {formatDate(order.createdAt)}
                       </p>
                       {order.payment && (
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">
-                          Paid via {order.payment.provider} • {order.payment.status}
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1 flex items-center gap-2">
+                          <span>Paid via {order.payment.provider} &bull; {order.payment.status}</span>
+                          {order.payment.provider === 'COD' && order.payment.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleMarkCodPaid(order.id)}
+                              disabled={updatingPaymentId === order.id}
+                              className="ml-1 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[9px] font-bold uppercase tracking-widest hover:bg-amber-500/30 transition-all disabled:opacity-50"
+                            >
+                              {updatingPaymentId === order.id ? '...' : 'Mark Paid'}
+                            </button>
+                          )}
                         </p>
                       )}
                     </div>

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, Truck, Zap, CheckCircle2, MapPin, ChevronDown, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, Truck, Zap, CheckCircle2, MapPin, ChevronDown, ShoppingCart, Banknote } from 'lucide-react';
 import { useCartStore, CartItem } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAddressStore } from '@/store/useAddressStore';
@@ -66,7 +66,7 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string>('');
   const [showSavedAddresses, setShowSavedAddresses] = useState(false);
-  const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYPAL'>('STRIPE');
+  const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYPAL' | 'COD'>('STRIPE');
   const [internalOrderId, setInternalOrderId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [purchasedItems, setPurchasedItems] = useState<CartItem[]>([]);
@@ -116,7 +116,8 @@ function CheckoutContent() {
   const nextStep = async () => {
     if (step === 'shipping') setStep('payment');
     else if (step === 'payment') {
-      if (!stripe || !elements) return;
+      // For Stripe we need the elements to be ready; COD and PayPal don't need them here
+      if (paymentProvider === 'STRIPE' && (!stripe || !elements)) return;
       setStep('review');
     } else if (step === 'review') {
       if (paymentProvider === 'STRIPE') {
@@ -183,6 +184,36 @@ function CheckoutContent() {
           setStep('success');
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : 'Failed to initiate deployment.';
+          addToast(message, 'error');
+        } finally {
+          setLoading(false);
+        }
+      } else if (paymentProvider === 'COD') {
+        // Cash on Delivery — order is confirmed server-side immediately
+        try {
+          setLoading(true);
+          const res = await ordersApi.checkout({
+            addressData: {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              email: formData.email,
+              address: formData.address,
+              city: formData.city,
+              postalCode: formData.postalCode,
+              country: formData.country,
+            },
+            paymentProvider: 'COD',
+          });
+
+          if (!res.order?.id) throw new Error('Failed to place COD order.');
+
+          setOrderNumber(res.order.orderNumber);
+          setPurchasedItems([...items]);
+          setSuccessMetrics({ subtotal, tax, shipping, total });
+          clearCart();
+          setStep('success');
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to place order.';
           addToast(message, 'error');
         } finally {
           setLoading(false);
@@ -540,7 +571,7 @@ function CheckoutContent() {
                     <div className="bg-surface-container-highest/5 border border-surface-container-highest/20 rounded-2xl p-6 space-y-8">
                        <div className="space-y-4">
                           <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-1">Select Payment Protocol</label>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-3 gap-4">
                              <button
                                onClick={() => setPaymentProvider('STRIPE')}
                                className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all ${paymentProvider === 'STRIPE' ? 'bg-primary/10 border-primary text-primary shadow-[0_0_15px_rgba(143,245,255,0.2)]' : 'bg-surface-container-highest/5 border-surface-container-highest/20 text-on-surface-variant'}`}
@@ -558,6 +589,13 @@ function CheckoutContent() {
                                   </svg>
                                </div>
                                <span className="text-[10px] font-bold uppercase tracking-widest">PayPal Link</span>
+                             </button>
+                             <button
+                               onClick={() => setPaymentProvider('COD')}
+                               className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all ${paymentProvider === 'COD' ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-surface-container-highest/5 border-surface-container-highest/20 text-on-surface-variant'}`}
+                             >
+                               <Banknote size={24} />
+                               <span className="text-[10px] font-bold uppercase tracking-widest">Cash on Delivery</span>
                              </button>
                           </div>
                        </div>
@@ -596,11 +634,18 @@ function CheckoutContent() {
                             </div>
                           </div>
                         </div>
-                       ) : (
+                       ) : paymentProvider === 'PAYPAL' ? (
                          <div className="space-y-6 pt-4 border-t border-surface-container-highest/10 animate-pulse">
                             <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl text-center space-y-2">
                                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">PayPal Protocol Active</p>
                                <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.05em]">Order confirmation will occur in the subsequent step.</p>
+                            </div>
+                         </div>
+                       ) : (
+                         <div className="space-y-6 pt-4 border-t border-surface-container-highest/10">
+                            <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl text-center space-y-2">
+                               <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Cash on Delivery Selected</p>
+                               <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.05em]">Pay with cash when your order arrives. No card required.</p>
                             </div>
                          </div>
                        )}
@@ -658,10 +703,16 @@ function CheckoutContent() {
                            <button onClick={() => setStep('payment')} className="text-[10px] text-primary font-bold uppercase tracking-widest hover:underline">Edit</button>
                         </div>
                         <div className="text-sm text-on-surface space-y-1">
-                          <p className="opacity-70 uppercase">{paymentProvider === 'STRIPE' ? formData.cardName : 'PayPal Authorized'}</p>
-                          <p className="text-xs text-on-surface-variant mt-2">
-                             {paymentProvider === 'STRIPE' ? 'Card details securely staged via Stripe.' : 'PayPal account link verified.'}
-                          </p>
+                           <p className="opacity-70 uppercase">
+                             {paymentProvider === 'STRIPE' ? formData.cardName : paymentProvider === 'PAYPAL' ? 'PayPal Authorized' : 'Cash on Delivery'}
+                           </p>
+                           <p className="text-xs text-on-surface-variant mt-2">
+                             {paymentProvider === 'STRIPE'
+                               ? 'Card details securely staged via Stripe.'
+                               : paymentProvider === 'PAYPAL'
+                               ? 'PayPal account link verified.'
+                               : 'Pay with cash upon delivery. No online payment required.'}
+                           </p>
                         </div>
                       </div>
                     </div>
@@ -700,6 +751,16 @@ function CheckoutContent() {
                         >
                           {loading ? 'PROCESSING...' : 'INITIATE DEPLOYMENT'}
                           {!loading && <Zap size={18} />}
+                        </button>
+                      )}
+                      {paymentProvider === 'COD' && (
+                        <button
+                          onClick={nextStep}
+                          disabled={loading}
+                          className="flex-2 flex items-center justify-center gap-2 bg-amber-500 text-black py-5 rounded-xl font-bold tracking-[0.2em] uppercase text-sm shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:shadow-[0_0_40px_rgba(245,158,11,0.5)] transition-all disabled:opacity-50"
+                        >
+                          {loading ? 'PLACING ORDER...' : 'PLACE COD ORDER'}
+                          {!loading && <Banknote size={18} />}
                         </button>
                       )}
                     </div>

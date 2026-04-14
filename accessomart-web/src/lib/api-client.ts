@@ -6,7 +6,7 @@
 
 import {
   AuthResponse, ApiUser, ApiCustomer, ApiProduct, ApiCart, ApiCartItem,
-  ApiOrder, ApiCategory, ApiPCBuild, ApiDashboardStats,
+  ApiOrder, ApiPayment, ApiCategory, ApiPCBuild, ApiDashboardStats,
   ApiHomepageSection, ApiAdminSettings, ApiAddress, ApiWishlistItem,
   ApiError, ApiBrand, ApiProductImage, ApiInventoryItem
 } from './api-types';
@@ -477,6 +477,12 @@ export const adminApi = {
 
   updateOrderStatus: (id: string, status: string) =>
     apiFetch<{ order: ApiOrder }>(`/admin/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  updatePaymentStatus: (orderId: string, status: 'PENDING' | 'CAPTURED' | 'FAILED' | 'REFUNDED') =>
+    apiFetch<{ payment: ApiPayment }>(`/orders/${orderId}/payment-status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),

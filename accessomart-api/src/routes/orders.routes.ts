@@ -268,6 +268,7 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
       return res.status(400).json({ error: `PayPal error: ${err.message}` });
     }
   }
+  // COD: no external payment provider call needed
 
   // Create order in transaction
   try {
@@ -290,6 +291,9 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
         finalAddressId = newAddress.id;
       }
 
+      // COD orders are confirmed immediately; others start as PENDING
+      const initialStatus = paymentProvider === 'COD' ? 'CONFIRMED' : 'PENDING';
+
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
@@ -301,6 +305,7 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
           total,
           couponCode,
           notes,
+          status: initialStatus,
           items: {
             create: cart.items.map(item => ({
               variantId: item.variantId,
@@ -316,7 +321,7 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
         include: { items: true },
       });
 
-      // Create payment stub (PENDING)
+      // Create payment record — COD starts PENDING (payment collected on delivery)
       await tx.payment.create({
         data: {
           orderId: newOrder.id,
@@ -327,14 +332,80 @@ orderRoutes.post('/', authenticate, validate(checkoutSchema), async (req: AuthRe
         },
       });
 
-      // We DO NOT clear the cart items yet. Cart items are only cleared upon successful payment.
+      // For COD: deduct stock and clear cart immediately (order is confirmed)
+      if (paymentProvider === 'COD') {
+        for (const item of cart.items) {
+          await tx.inventory.updateMany({
+            where: { variantId: item.variantId },
+            data: { quantity: { decrement: item.quantity } },
+          });
+        }
+        const cart2 = await tx.cart.findUnique({ where: { userId: req.userId! } });
+        if (cart2) {
+          await tx.cartItem.deleteMany({ where: { cartId: cart2.id } });
+        }
+      }
+      // For STRIPE / PAYPAL: cart is cleared only after successful payment capture.
+
       return newOrder;
     });
+
+    // Dispatch order confirmation email for COD orders (async, non-blocking)
+    if (paymentProvider === 'COD') {
+      const userForEmail = await prisma.user.findUnique({ where: { id: req.userId! } });
+      const addressForEmail = order.addressId
+        ? await prisma.address.findUnique({ where: { id: order.addressId } })
+        : null;
+
+      if (userForEmail) {
+        sendOrderConfirmationEmail(userForEmail.email, orderNumber, {
+          name: userForEmail.firstName,
+          totalAmount: Number(total),
+          items: order.items.map(i => ({
+            productName: i.productName,
+            variantName: i.variantName,
+            quantity: i.quantity,
+            totalPrice: Number(i.totalPrice),
+          })),
+          address: addressForEmail as any,
+          paymentMethod: 'COD',
+        }).catch(err => {
+          console.error('[COD Order] Failed to dispatch confirmation email:', err);
+        });
+      }
+    }
 
     return res.status(201).json({ order, clientSecret });
   } catch (err: any) {
     console.error('[Orders API] Checkout Transaction Error:', err);
     return res.status(500).json({ error: 'Failed to process checkout. Please try again.', details: err.message });
+  }
+});
+
+// ─── PATCH /api/v1/orders/:id/payment-status (Admin only) ────────────────────
+// Allows admin to mark a COD order's payment as PAID once cash is collected.
+const paymentStatusSchema = z.object({
+  status: z.enum(['PENDING', 'CAPTURED', 'FAILED', 'REFUNDED']),
+});
+
+orderRoutes.patch('/:id/payment-status', authenticate, requireAdmin, validate(paymentStatusSchema), async (req: AuthRequest, res) => {
+  const { status } = req.body;
+  try {
+    const payment = await prisma.payment.findUnique({ where: { orderId: req.params.id } });
+    if (!payment) return res.status(404).json({ error: 'Payment record not found for this order.' });
+
+    const updateData: any = { status };
+    if (status === 'CAPTURED') updateData.paidAt = new Date();
+
+    const updated = await prisma.payment.update({
+      where: { orderId: req.params.id },
+      data: updateData,
+    });
+
+    return res.json({ payment: updated });
+  } catch (error: any) {
+    console.error('[Orders API] Payment Status Update Error:', error);
+    return res.status(500).json({ error: 'Failed to update payment status', details: error.message });
   }
 });
 
