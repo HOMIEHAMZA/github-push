@@ -227,14 +227,15 @@ model WishlistItem {
 }
 
 model Cart {
-  id         String     @id @default(cuid())
-  userId     String?    @unique @map("user_id")
-  sessionId  String?    @unique @map("session_id")
-  couponCode String?    @map("coupon_code")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
-  items      CartItem[]
-  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String     @id @default(cuid())
+  userId             String?    @unique @map("user_id")
+  sessionId          String?    @unique @map("session_id")
+  couponCode         String?    @map("coupon_code")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  abandonedEmailSent Boolean    @default(false) @map("abandoned_email_sent")
+  items              CartItem[]
+  user               User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("carts")
 }

@@ -376,3 +376,59 @@ export const sendSupportInquiryEmail = async (data: {
     html: userHtml,
   });
 };
+
+/**
+ * Ships an abandoned cart recovery transmission
+ */
+export const sendAbandonedCartEmail = async (email: string, items: any[], total: string | number) => {
+  const cartUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/cart`;
+  
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
+        <img src="${item.variant?.imageUrl || item.variant?.product?.images?.[0]?.url || 'https://via.placeholder.com/50'}" alt="${item.variant?.name || item.variant?.product?.name || 'Product'}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" />
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-family: sans-serif;">
+        <strong>${item.variant?.product?.name || 'Product'}</strong><br/>
+        <span style="font-size: 14px; color: #6b7280;">${item.variant?.name || ''}</span>
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-family: sans-serif; text-align: right;">
+        x${item.quantity}
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-family: sans-serif; text-align: right;">
+        $${(Number(item.variant?.price || 0) * item.quantity).toFixed(2)}
+      </td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
+      <h2 style="color: #6366f1;">You left something behind...</h2>
+      <p>Hi there,</p>
+      <p>We noticed you left some great gear in your cart. Your items are waiting, but stock is limited!</p>
+      
+      <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+        ${itemsHtml}
+      </table>
+      
+      <div style="text-align: right; margin-bottom: 24px;">
+        <strong style="font-size: 18px;">Total: $${Number(total).toFixed(2)}</strong>
+      </div>
+      
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${cartUrl}" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Complete Your Purchase</a>
+      </div>
+      
+      <p style="font-size: 14px; color: #6b7280; text-align: center;">
+        Need help? Reply directly to this email to reach our support team.
+      </p>
+    </div>
+  `;
+
+  await sendMail({
+    to: email,
+    subject: "Hurry! Your cart is waiting...",
+    html,
+  });
+};
+

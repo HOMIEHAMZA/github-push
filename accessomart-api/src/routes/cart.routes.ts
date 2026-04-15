@@ -91,12 +91,14 @@ cartRoutes.post('/items', authenticate, validate(cartItemSchema), async (req: Au
       where: { id: existingItem.id },
       data: { quantity: existingItem.quantity + quantity },
     });
+    await prisma.cart.update({ where: { id: cart.id }, data: { abandonedEmailSent: false, updatedAt: new Date() } });
     return res.json({ item });
   }
 
   const item = await prisma.cartItem.create({
     data: { cartId: cart.id, variantId, quantity },
   });
+  await prisma.cart.update({ where: { id: cart.id }, data: { abandonedEmailSent: false, updatedAt: new Date() } });
   return res.status(201).json({ item });
 });
 
@@ -105,7 +107,8 @@ cartRoutes.patch('/items/:itemId', authenticate, validate(cartItemUpdateSchema),
   const { quantity } = req.body;
 
   if (quantity <= 0) {
-    await prisma.cartItem.delete({ where: { id: req.params.itemId } });
+    const deleted = await prisma.cartItem.delete({ where: { id: req.params.itemId } });
+    await prisma.cart.update({ where: { id: deleted.cartId }, data: { abandonedEmailSent: false, updatedAt: new Date() } });
     return res.json({ message: 'Item removed.' });
   }
 
@@ -130,12 +133,14 @@ cartRoutes.patch('/items/:itemId', authenticate, validate(cartItemUpdateSchema),
     where: { id: req.params.itemId },
     data: { quantity },
   });
+  await prisma.cart.update({ where: { id: cartItem.cartId }, data: { abandonedEmailSent: false, updatedAt: new Date() } });
   return res.json({ item });
 });
 
 // ─── DELETE /api/v1/cart/items/:itemId ───────────────────────────────────────
 cartRoutes.delete('/items/:itemId', authenticate, async (req: AuthRequest, res) => {
-  await prisma.cartItem.delete({ where: { id: req.params.itemId } });
+  const item = await prisma.cartItem.delete({ where: { id: req.params.itemId } });
+  await prisma.cart.update({ where: { id: item.cartId }, data: { abandonedEmailSent: false, updatedAt: new Date() } });
   return res.json({ message: 'Item removed.' });
 });
 

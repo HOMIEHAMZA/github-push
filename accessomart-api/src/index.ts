@@ -129,7 +129,10 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+import { startAbandonedCartCron } from './jobs/abandoned-cart.job';
+
 app.listen(PORT, () => {
+  startAbandonedCartCron();
   console.log(`
   ┌──────────────────────────────────────────┐
   │   ACCESSOMART API — Running on :${PORT}    │
