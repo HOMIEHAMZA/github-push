@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { z } from 'zod';
+import { processAbandonedCarts } from '../jobs/abandoned-cart.job';
 
 export const cartRoutes = Router();
 
@@ -150,4 +151,32 @@ cartRoutes.delete('/', authenticate, async (req: AuthRequest, res) => {
     where: { cart: { userId: req.userId } },
   });
   return res.json({ message: 'Cart cleared.' });
+});
+
+// ─── POST /api/v1/cart/test-abandoned (Admin / Dev only) ───────────────────────
+
+cartRoutes.post('/test-abandoned', authenticate, async (req: AuthRequest, res) => {
+  const cart = await prisma.cart.findUnique({ where: { userId: req.userId } });
+  
+  if (cart) {
+    await prisma.cart.update({
+      where: { id: cart.id },
+      data: { 
+        updatedAt: new Date(Date.now() - (3 * 60 * 60 * 1000)), // force 3 hours ago
+        abandonedEmailSent: false 
+      }
+    });
+  }
+
+  // trigger job manually
+  await processAbandonedCarts();
+
+  // Re-fetch to see if the flag was updated indicating success
+  const updatedCart = await prisma.cart.findUnique({ where: { userId: req.userId } });
+
+  return res.json({ 
+    message: 'Abandoned cart job triggered safely.',
+    cartFound: !!cart,
+    emailSent: updatedCart?.abandonedEmailSent || false
+  });
 });
