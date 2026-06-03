@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Cinzel, Rajdhani } from "next/font/google";
 import { GlassNavbar } from "@/components/ui/GlassNavbar";
 import { Footer } from "@/components/ui/Footer";
 import { CartDrawer } from "@/components/cart/CartDrawer";
@@ -8,13 +8,14 @@ import { GuestAuthProvider } from "@/components/providers/GuestAuthProvider";
 import { VerificationBanner } from "@/components/auth/VerificationBanner";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
   subsets: ["latin"],
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const rajdhani = Rajdhani({
+  variable: "--font-rajdhani",
+  weight: ["300", "400", "500", "600", "700"],
   subsets: ["latin"],
 });
 
@@ -34,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} dark antialiased`}
+      className={`${cinzel.variable} ${rajdhani.variable} dark antialiased`}
     >
       <body className="bg-surface text-on-surface font-sans min-h-screen flex flex-col">
         <GuestAuthProvider>
