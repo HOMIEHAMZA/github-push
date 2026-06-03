@@ -6,6 +6,7 @@ import { ShoppingBag, Search, User, LogOut } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAdminStore } from '@/store/useAdminStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { Logo } from '@/components/ui/Logo';
 
 export function GlassNavbar() {
   const { getTotalItems, openDrawer } = useCartStore();
@@ -31,18 +32,7 @@ export function GlassNavbar() {
         shadow-[0_20px_60px_rgba(0,0,0,0.6)]
       `}>
         {/* Logo */}
-        <Link href="/" className="flex flex-col items-center justify-center group">
-          <svg className="w-8 h-8 text-primary mb-1 group-hover:scale-105 transition-transform duration-500" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.5L15 9.5L22.5 11.5L17 15.5L18.5 22.5L12 18.5L5.5 22.5L7 15.5L1.5 11.5L9 9.5L12 2.5Z" opacity="0.9" />
-            <circle cx="12" cy="7" r="2" fill="var(--color-on-surface)" />
-          </svg>
-          <div className="font-display font-medium text-primary text-xl tracking-wider uppercase leading-none">Accesso</div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="h-[1px] w-4 bg-primary/40"></div>
-            <div className="text-primary text-[10px] tracking-[0.4em] uppercase font-bold leading-none">Mart</div>
-            <div className="h-[1px] w-4 bg-primary/40"></div>
-          </div>
-        </Link>
+        <Logo />
         
         {/* Desktop Links */}
         <div className="hidden md:flex items-center space-x-12">

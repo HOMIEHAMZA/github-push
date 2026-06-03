@@ -2,6 +2,7 @@
 import React from 'react';
 import { ShieldCheck, Truck, Headset } from 'lucide-react';
 import Link from 'next/link';
+import { Logo } from '@/components/ui/Logo';
 
 export function Footer() {
   const [subscribed, setSubscribed] = React.useState(false);
@@ -11,18 +12,9 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
         {/* Brand Area */}
         <div className="col-span-1 md:col-span-1 flex flex-col items-start pr-8 border-r border-primary/10">
-          <Link href="/" className="flex flex-col items-start group mb-6">
-            <svg className="w-10 h-10 text-primary mb-2 group-hover:scale-105 transition-transform duration-500" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2.5L15 9.5L22.5 11.5L17 15.5L18.5 22.5L12 18.5L5.5 22.5L7 15.5L1.5 11.5L9 9.5L12 2.5Z" opacity="0.9" />
-              <circle cx="12" cy="7" r="2" fill="var(--color-on-surface)" />
-            </svg>
-            <div className="font-display font-medium text-primary text-2xl tracking-wider uppercase leading-none">Accesso</div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="h-[1px] w-6 bg-primary/40"></div>
-              <div className="text-primary text-xs tracking-[0.4em] uppercase font-bold leading-none">Mart</div>
-              <div className="h-[1px] w-6 bg-primary/40"></div>
-            </div>
-          </Link>
+          <div className="mb-8 origin-left scale-90">
+            <Logo />
+          </div>
           <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs font-light">
             The digital curator for elite electronics and gaming gear. Built for performance without compromise.
           </p>
